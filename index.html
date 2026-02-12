@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MASH Quiz</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;max-width:820px}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .card{padding:16px;border:1px solid #ddd;border-radius:14px;margin:12px 0}
+    label{display:block;margin-bottom:6px;font-weight:600}
+    input,select{padding:10px;border-radius:10px;border:1px solid #ccc;width:100%}
+    button{padding:10px 14px;border-radius:12px;border:0;cursor:pointer}
+    .muted{opacity:.7}
+    .pill{display:inline-block;padding:6px 10px;border:1px solid #ddd;border-radius:999px}
+  </style>
+</head>
+<body>
+  <h1 id="title">MASH — Quiz</h1>
+
+  <div class="row">
+    <span class="pill" id="gamePill">game: ?</span>
+    <span class="pill" id="recvPill">réponses: -</span>
+  </div>
+
+  <div class="card">
+    <label>Pseudo</label>
+    <input id="playerName" placeholder="Ton pseudo" />
+  </div>
+
+  <div id="quizRoot"></div>
+
+  <button id="send">Envoyer</button>
+  <p class="muted" id="status"></p>
+
+<script>
+  // ✅ Mets ton URL de Web App Apps Script (…/exec)
+  const BASE = "COLLE_ICI_TON_URL_APPS_SCRIPT";
+
+  // ✅ (optionnel) doit matcher WRITE_TOKEN côté Apps Script
+  const WRITE_TOKEN = "CHANGE_ME_TO_A_SECRET";
+
+  const params = new URLSearchParams(location.search);
+  const gameId = (params.get("game") || "").trim();
+
+  const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
+  localStorage.setItem("mash_playerId", playerId);
+
+  const answers = {}; // qId -> value
+  let quiz = null;
+
+  const elTitle = document.getElementById("title");
+  const elGamePill = document.getElementById("gamePill");
+  const elRecvPill = document.getElementById("recvPill");
+  const elQuizRoot = document.getElementById("quizRoot");
+  const elStatus = document.getElementById("status");
+
+  elGamePill.textContent = `game: ${gameId || "MISSING"}`;
+
+  function renderQuestion(q) {
+    const wrap = document.createElement("div");
+    wrap.className = "card";
+
+    const p = document.createElement("p");
+    p.style.fontWeight = "700";
+    p.textContent = q.prompt;
+    wrap.appendChild(p);
+
+    if (q.type === "mcq") {
+      const select = document.createElement("select");
+      const opt0 = document.createElement("option");
+      opt0.value = "";
+      opt0.textContent = "— Choisir —";
+      select.appendChild(opt0);
+
+      q.choices.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        select.appendChild(opt);
+      });
+
+      select.addEventListener("change", () => { answers[q.qId] = select.value; });
+      wrap.appendChild(select);
+    } else {
+      const input = document.createElement("input");
+      input.placeholder = "Réponse…";
+      input.addEventListener("input", () => { answers[q.qId] = input.value; });
+      wrap.appendChild(input);
+    }
+
+    return wrap;
+  }
+
+  async function loadQuiz() {
+    if (!gameId) {
+      elStatus.textContent = "Lien invalide : il manque ?game=XXXX";
+      return;
+    }
+    elStatus.textContent = "Chargement du quiz…";
+
+    const url = `${BASE}?action=quiz&game=${encodeURIComponent(gameId)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.ok) {
+      elStatus.textContent = `Impossible de charger : ${data.error}`;
+      return;
+    }
+
+    quiz = data;
+    elTitle.textContent = data.title || "MASH — Quiz";
+
+    elQuizRoot.innerHTML = "";
+    data.questions.forEach(q => elQuizRoot.appendChild(renderQuestion(q)));
+
+    elStatus.textContent = "Prêt ✅";
+  }
+
+  async function submit() {
+    if (!quiz) return;
+
+    elStatus.textContent = "Envoi…";
+
+    const payload = {
+      token: WRITE_TOKEN,
+      gameId,
+      playerId,
+      playerName: document.getElementById("playerName").value.trim(),
+      answers,
+      userAgent: navigator.userAgent
+    };
+
+    // Astuce Apps Script: souvent plus stable en text/plain
+    const res = await fetch(BASE, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
+    });
+
+    let data = null;
+    try { data = await res.json(); } catch(_) {}
+
+    if (data && data.ok) {
+      elStatus.textContent = `Réponse envoyée ✅ (score: ${data.score ?? 0})`;
+    } else {
+      elStatus.textContent = "Réponse envoyée ✅ (vérifie la sheet si doute)";
+    }
+  }
+
+  async function pollStatus() {
+    if (!gameId) return;
+    try {
+      const url = `${BASE}?action=status&game=${encodeURIComponent(gameId)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.ok) {
+        elRecvPill.textContent = `réponses: ${data.received}${quiz?.expectedPlayers ? " / " + quiz.expectedPlayers : ""}`;
+      }
+    } catch (_) {}
+  }
+
+  document.getElementById("send").addEventListener("click", submit);
+
+  // init
+  loadQuiz().then(() => {
+    pollStatus();
+    setInterval(pollStatus, 2000);
+  });
+</script>
+</body>
+</html>
