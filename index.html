@@ -21,133 +21,228 @@
   <div class="row">
     <span class="pill" id="gamePill">game: ?</span>
     <span class="pill" id="recvPill">réponses: -</span>
+    <span class="pill" id="timerPill" style="display:none;">temps: -</span>
   </div>
-
-  <div class="card">
+  
+  <div id="startCard" class="card">
     <label>Pseudo</label>
     <input id="playerName" placeholder="Ton pseudo" />
+    <div style="margin-top:12px" class="row">
+      <button id="startBtn">Commencer</button>
+      <span class="muted" id="startHint"></span>
+    </div>
   </div>
-
-  <div id="quizRoot"></div>
-
-  <button id="send">Envoyer</button>
+  
+  <div id="quizArea" style="display:none;">
+    <div id="quizRoot"></div>
+    <button id="send">Envoyer</button>
+  </div>
+  
   <p class="muted" id="status"></p>
 
 <script>
   // ✅ Mets ton URL de Web App Apps Script (…/exec)
   const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec";
-
-  // ✅ (optionnel) doit matcher WRITE_TOKEN côté Apps Script
   const WRITE_TOKEN = "YUKI";
-
+  
   const params = new URLSearchParams(location.search);
   const gameId = (params.get("game") || "").trim();
-
+  
   const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
   localStorage.setItem("mash_playerId", playerId);
-
-  const answers = {}; // qId -> value
-  let quiz = null;
-
-  const elTitle = document.getElementById("title");
+  
   const elGamePill = document.getElementById("gamePill");
   const elRecvPill = document.getElementById("recvPill");
+  const elTimerPill = document.getElementById("timerPill");
+  
+  const elStartCard = document.getElementById("startCard");
+  const elStartBtn = document.getElementById("startBtn");
+  const elStartHint = document.getElementById("startHint");
+  const elPlayerName = document.getElementById("playerName");
+  
+  const elQuizArea = document.getElementById("quizArea");
   const elQuizRoot = document.getElementById("quizRoot");
+  const elSend = document.getElementById("send");
   const elStatus = document.getElementById("status");
-
+  
   elGamePill.textContent = `game: ${gameId || "MISSING"}`;
-
+  
+  let quiz = null;
+  let answers = {};
+  let timerInterval = null;
+  let remaining = 0;
+  let locked = false;
+  
+  function setStatus(msg) { elStatus.textContent = msg || ""; }
+  
+  function lockQuiz(reason) {
+    locked = true;
+    // désactive tous les inputs/selects
+    elQuizRoot.querySelectorAll("input, select, textarea, button").forEach(el => {
+      el.disabled = true;
+    });
+    elSend.disabled = true;
+    setStatus(reason || "Temps écoulé. Réponses envoyées.");
+  }
+  
+  function formatTime(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    const m = String(Math.floor(sec / 60)).padStart(2, "0");
+    const s = String(sec % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
+  
   function renderQuestion(q) {
     const wrap = document.createElement("div");
     wrap.className = "card";
-
+  
     const p = document.createElement("p");
     p.style.fontWeight = "700";
     p.textContent = q.prompt;
     wrap.appendChild(p);
-
-    if (q.type === "mcq") {
-      const select = document.createElement("select");
-      const opt0 = document.createElement("option");
-      opt0.value = "";
-      opt0.textContent = "— Choisir —";
-      select.appendChild(opt0);
-
-      q.choices.forEach(c => {
-        const opt = document.createElement("option");
-        opt.value = c;
-        opt.textContent = c;
-        select.appendChild(opt);
-      });
-
-      select.addEventListener("change", () => { answers[q.qId] = select.value; });
-      wrap.appendChild(select);
-    } else {
-      const input = document.createElement("input");
-      input.placeholder = "Réponse…";
-      input.addEventListener("input", () => { answers[q.qId] = input.value; });
-      wrap.appendChild(input);
-    }
-
+  
+    const input = document.createElement("input");
+    input.placeholder = "Réponse…";
+    input.addEventListener("input", () => { answers[q.qId] = input.value; });
+    wrap.appendChild(input);
+  
     return wrap;
   }
-
-  async function loadQuiz() {
-    if (!gameId) {
-      elStatus.textContent = "Lien invalide : il manque ?game=XXXX";
-      return;
-    }
-    elStatus.textContent = "Chargement du quiz…";
-
+  
+  async function fetchQuiz() {
     const url = `${BASE}?action=quiz&game=${encodeURIComponent(gameId)}`;
     const res = await fetch(url);
     const data = await res.json();
-
-    if (!data.ok) {
-      elStatus.textContent = `Impossible de charger : ${data.error}`;
-      return;
-    }
-
-    quiz = data;
-    elTitle.textContent = data.title || "MASH — Quiz";
-
-    elQuizRoot.innerHTML = "";
-    data.questions.forEach(q => elQuizRoot.appendChild(renderQuestion(q)));
-
-    elStatus.textContent = "Prêt ✅";
+    return data;
   }
-
-  async function submit() {
-    if (!quiz) return;
-
-    elStatus.textContent = "Envoi…";
-
+  
+  async function submit(auto=false) {
+    if (!quiz || locked) return;
+  
+    const playerName = elPlayerName.value.trim();
+    if (!playerName) return;
+  
     const payload = {
       token: WRITE_TOKEN,
       gameId,
       playerId,
-      playerName: document.getElementById("playerName").value.trim(),
+      playerName,
       answers,
-      userAgent: navigator.userAgent
+      userAgent: navigator.userAgent,
+      autoSubmit: auto
     };
-
-    // Astuce Apps Script: souvent plus stable en text/plain
-    const res = await fetch(BASE, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload),
-    });
-
-    let data = null;
-    try { data = await res.json(); } catch(_) {}
-
-    if (data && data.ok) {
-      elStatus.textContent = `Réponse envoyée ✅ (score: ${data.score ?? 0})`;
-    } else {
-      elStatus.textContent = "Réponse envoyée ✅ (vérifie la sheet si doute)";
+  
+    try {
+      const res = await fetch(BASE, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+      });
+  
+      // lecture JSON (peut échouer parfois, mais on essaye)
+      let data = null;
+      try { data = await res.json(); } catch (_) {}
+  
+      if (data && data.ok) {
+        setStatus(`Réponses envoyées ✅ (score: ${data.score ?? 0})`);
+        // verrouille après envoi (pour éviter double envoi)
+        if (timerInterval) clearInterval(timerInterval);
+        lockQuiz("Réponses envoyées ✅");
+      } else {
+        setStatus("Envoi effectué ✅ (vérifie la sheet si besoin)");
+        if (timerInterval) clearInterval(timerInterval);
+        lockQuiz("Réponses envoyées ✅");
+      }
+    } catch (e) {
+      setStatus("Erreur d’envoi ❌ (réessaie)");
+      console.warn(e);
     }
   }
-
+  
+  function startTimer(timeLimitSec) {
+    remaining = Number(timeLimitSec || 0);
+    if (!Number.isFinite(remaining) || remaining <= 0) {
+      // pas de timer => pas de limitation
+      elTimerPill.style.display = "none";
+      return;
+    }
+  
+    elTimerPill.style.display = "inline-block";
+    elTimerPill.textContent = `temps: ${formatTime(remaining)}`;
+  
+    timerInterval = setInterval(() => {
+      if (locked) return;
+      remaining -= 1;
+      elTimerPill.textContent = `temps: ${formatTime(remaining)}`;
+  
+      if (remaining <= 0) {
+        clearInterval(timerInterval);
+        // auto-submit
+        submit(true);
+        // si submit échoue pour une raison réseau, on verrouille quand même l’UI
+        lockQuiz("Temps écoulé. Envoi automatique…");
+      }
+    }, 1000);
+  }
+  
+  async function initStartScreen() {
+    if (!gameId) {
+      setStatus("Lien invalide : il manque ?game=XXXX");
+      elStartBtn.disabled = true;
+      return;
+    }
+  
+    setStatus("Vérification de la partie…");
+    const data = await fetchQuiz();
+  
+    if (!data.ok) {
+      setStatus(`Impossible de charger : ${data.error}`);
+      elStartBtn.disabled = true;
+      return;
+    }
+  
+    quiz = data;
+    document.getElementById("title")?.remove?.(); // si tu as un title id, ignore sinon
+  
+    // Conditions d’accès
+    const isOpen = true; // si ok:true, c’est OPEN (ton backend bloque sinon)
+    elStartBtn.disabled = !isOpen;
+  
+    setStatus("Prêt. Renseigne ton pseudo et clique Commencer.");
+    validateStartButton();
+  }
+  
+  function validateStartButton() {
+    const nameOk = elPlayerName.value.trim().length > 0;
+    elStartBtn.disabled = !quiz || !nameOk;
+    elStartHint.textContent = nameOk ? "" : "Entre un pseudo pour commencer";
+  }
+  
+  elPlayerName.addEventListener("input", validateStartButton);
+  
+  elStartBtn.addEventListener("click", async () => {
+    if (!quiz) return;
+    const name = elPlayerName.value.trim();
+    if (!name) return;
+  
+    // Afficher les questions maintenant seulement
+    elStartCard.style.display = "none";
+    elQuizArea.style.display = "block";
+  
+    answers = {};
+    elQuizRoot.innerHTML = "";
+    quiz.questions.forEach(q => elQuizRoot.appendChild(renderQuestion(q)));
+  
+    setStatus("Quiz démarré ✅");
+    startTimer(quiz.timeLimitSec);
+  
+    // start polling status si tu veux
+    pollStatus();
+    setInterval(pollStatus, 2000);
+  });
+  
+  elSend.addEventListener("click", () => submit(false));
+  
   async function pollStatus() {
     if (!gameId) return;
     try {
@@ -155,18 +250,13 @@
       const res = await fetch(url);
       const data = await res.json();
       if (data.ok) {
-        elRecvPill.textContent = `réponses: ${data.received}${quiz?.expectedPlayers ? " / " + quiz.expectedPlayers : ""}`;
+        elRecvPill.textContent = `réponses: ${data.received}${data.expectedPlayers ? " / " + data.expectedPlayers : ""}`;
       }
     } catch (_) {}
   }
-
-  document.getElementById("send").addEventListener("click", submit);
-
+  
   // init
-  loadQuiz().then(() => {
-    pollStatus();
-    setInterval(pollStatus, 2000);
-  });
+  initStartScreen();
 </script>
 </body>
 </html>
