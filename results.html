@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MASH — Résultats</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;max-width:900px}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .pill{display:inline-block;padding:6px 10px;border:1px solid #ddd;border-radius:999px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border-bottom:1px solid #eee;padding:10px;text-align:left}
+    th{opacity:.7;font-weight:700}
+    .muted{opacity:.7}
+  </style>
+</head>
+<body>
+  <h1>MASH — Résultats</h1>
+
+  <div class="row">
+    <span class="pill" id="gamePill">game: ?</span>
+    <span class="pill" id="countPill">lignes: -</span>
+    <span class="pill" id="refreshPill">maj: -</span>
+  </div>
+
+  <p class="muted" id="status"></p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Joueur</th>
+        <th>Score</th>
+        <th>Horodatage</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+<script>
+  const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec"; // .../exec
+
+  const params = new URLSearchParams(location.search);
+  const gameId = (params.get("game") || "").trim();
+
+  const elGamePill = document.getElementById("gamePill");
+  const elCountPill = document.getElementById("countPill");
+  const elRefreshPill = document.getElementById("refreshPill");
+  const elStatus = document.getElementById("status");
+  const tbody = document.getElementById("tbody");
+
+  elGamePill.textContent = `game: ${gameId || "MISSING"}`;
+
+  function setStatus(msg){ elStatus.textContent = msg || ""; }
+
+  function render(rows){
+    tbody.innerHTML = "";
+    rows.forEach((r, idx) => {
+      const tr = document.createElement("tr");
+
+      const tdRank = document.createElement("td");
+      tdRank.textContent = String(idx + 1);
+
+      const tdName = document.createElement("td");
+      tdName.textContent = r.playerName || "(sans nom)";
+
+      const tdScore = document.createElement("td");
+      tdScore.textContent = String(r.score ?? 0);
+
+      const tdTs = document.createElement("td");
+      tdTs.textContent = r.ts ? new Date(r.ts).toLocaleTimeString("fr-FR") : "";
+
+      tr.appendChild(tdRank);
+      tr.appendChild(tdName);
+      tr.appendChild(tdScore);
+      tr.appendChild(tdTs);
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function fetchLeaderboard(){
+    if (!gameId) { setStatus("Lien invalide : ?game=... manquant"); return; }
+
+    try{
+      const url = `${BASE}?action=leaderboard&game=${encodeURIComponent(gameId)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!data.ok){
+        setStatus(`Erreur: ${data.error}`);
+        return;
+      }
+
+      elCountPill.textContent = `lignes: ${data.count}`;
+      elRefreshPill.textContent = `maj: ${new Date().toLocaleTimeString("fr-FR")}`;
+      setStatus("");
+
+      render(data.leaderboard || []);
+    } catch(e){
+      setStatus("Impossible de récupérer les résultats (réseau ?)");
+      console.warn(e);
+    }
+  }
+
+  // 1er chargement + refresh auto
+  fetchLeaderboard();
+  setInterval(fetchLeaderboard, 2000);
+</script>
+</body>
+</html>
