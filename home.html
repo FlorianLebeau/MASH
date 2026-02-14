@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MASH — Home</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;max-width:820px}
+    .card{padding:16px;border:1px solid #ddd;border-radius:14px;margin:12px 0}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    input{padding:10px;border-radius:10px;border:1px solid #ccc;min-width:260px}
+    a.btn,button{display:inline-block;padding:10px 14px;border-radius:12px;border:0;cursor:pointer;text-decoration:none}
+    a.btn{border:1px solid #ddd}
+    .muted{opacity:.7}
+    h1{margin-bottom:6px}
+  </style>
+</head>
+<body>
+  <h1>MASH</h1>
+  <p class="muted">Choisis un jeu / une page. (D’autres modes seront ajoutés ici.)</p>
+
+  <div class="card">
+    <label for="gameId" style="display:block;font-weight:700;margin-bottom:6px;">Game ID</label>
+    <div class="row">
+      <input id="gameId" placeholder="Ex: ABCD1234" />
+      <button id="save">Enregistrer</button>
+      <span class="muted" id="saved"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0;">Jeux</h2>
+    <div class="row">
+      <a class="btn" id="playLink" href="#">▶️ Lancer le Quiz (joueur)</a>
+      <a class="btn" id="resultsLink" href="#">🏆 Voir les Résultats</a>
+    </div>
+    <p class="muted" id="hint" style="margin-bottom:0;"></p>
+  </div>
+
+<script>
+  const input = document.getElementById("gameId");
+  const saved = document.getElementById("saved");
+  const hint = document.getElementById("hint");
+
+  const playLink = document.getElementById("playLink");
+  const resultsLink = document.getElementById("resultsLink");
+
+  function updateLinks() {
+    const game = (input.value || "").trim();
+    if (!game) {
+      playLink.href = "#";
+      resultsLink.href = "#";
+      hint.textContent = "Renseigne un Game ID pour activer les liens.";
+      return;
+    }
+    playLink.href = `./index.html?game=${encodeURIComponent(game)}`;
+    resultsLink.href = `./results.html?game=${encodeURIComponent(game)}`;
+    hint.textContent = "";
+  }
+
+  // Load last used gameId
+  const last = localStorage.getItem("mash_last_gameId") || "";
+  input.value = last;
+  updateLinks();
+
+  input.addEventListener("input", updateLinks);
+
+  document.getElementById("save").addEventListener("click", () => {
+    const game = (input.value || "").trim();
+    if (!game) return;
+    localStorage.setItem("mash_last_gameId", game);
+    saved.textContent = "✓ enregistré";
+    setTimeout(() => saved.textContent = "", 1500);
+    updateLinks();
+  });
+
+  // Prevent navigation if missing
+  [playLink, resultsLink].forEach(a => {
+    a.addEventListener("click", (e) => {
+      if (!a.href || a.getAttribute("href") === "#") e.preventDefault();
+    });
+  });
+</script>
+</body>
+</html>
