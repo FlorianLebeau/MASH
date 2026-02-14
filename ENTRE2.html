@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MASH — ENTRE2</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;max-width:860px}
+    .card{padding:16px;border:1px solid #ddd;border-radius:14px;margin:12px 0}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .pill{display:inline-block;padding:6px 10px;border:1px solid #ddd;border-radius:999px}
+    .muted{opacity:.7}
+    input[type="range"]{width:100%}
+    .rangeWrap{position:relative}
+  </style>
+</head>
+<body>
+  <h1>ENTRE2</h1>
+
+  <div class="row">
+    <span class="pill" id="scalePill">scale: -</span>
+    <span class="pill" id="unitPill">unit: -</span>
+  </div>
+
+  <div class="card">
+    <div id="aff" style="font-weight:800;font-size:18px;">Chargement…</div>
+    <div class="muted" id="qid" style="margin-top:6px;"></div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700;margin-bottom:10px;">Choisis ton intervalle</div>
+
+    <div class="rangeWrap">
+      <div class="muted" id="ticks" style="margin-bottom:10px;"></div>
+
+      <label class="muted">Borne min</label>
+      <input id="minR" type="range" />
+
+      <label class="muted" style="margin-top:10px;display:block;">Borne max</label>
+      <input id="maxR" type="range" />
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <span class="pill" id="intervalPill">intervalle: -</span>
+    </div>
+  </div>
+
+  <p class="muted" id="status"></p>
+
+<script>
+  const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec"; // .../exec
+
+  const aff = document.getElementById("aff");
+  const qid = document.getElementById("qid");
+  const scalePill = document.getElementById("scalePill");
+  const unitPill = document.getElementById("unitPill");
+  const ticksEl = document.getElementById("ticks");
+  const intervalPill = document.getElementById("intervalPill");
+  const statusEl = document.getElementById("status");
+
+  const minR = document.getElementById("minR");
+  const maxR = document.getElementById("maxR");
+
+  let cfg = null; // {min, max, step, ticks[]}
+  let unit = "";
+
+  function configForScaleGroup(g) {
+    if (g === 1) return { min: 1, max: 10, step: 1 };
+    if (g === 2) return { min: 10, max: 100, step: 10 };
+    if (g === 3) return { min: 100, max: 1000, step: 100 };
+    // fallback
+    return { min: 1, max: 10, step: 1 };
+  }
+
+  function buildTicks({min,max,step}) {
+    const out = [];
+    for (let v = min; v <= max; v += step) out.push(v);
+    return out; // 10 crans (ou 11 si tu inclus les bornes, ici tu as 10 intervalles? -> on affiche les valeurs)
+  }
+
+  function setSliders({min,max,step}) {
+    minR.min = min; minR.max = max; minR.step = step;
+    maxR.min = min; maxR.max = max; maxR.step = step;
+
+    minR.value = min;
+    maxR.value = max;
+  }
+
+  function sync() {
+    let a = Number(minR.value);
+    let b = Number(maxR.value);
+    if (a > b) { // empêche inversion
+      if (event?.target === minR) b = a;
+      else a = b;
+      minR.value = a;
+      maxR.value = b;
+    }
+    intervalPill.textContent = `intervalle: ${a} – ${b} ${unit}`.trim();
+  }
+
+  minR.addEventListener("input", sync);
+  maxR.addEventListener("input", sync);
+
+  async function loadQuestion() {
+    statusEl.textContent = "Chargement de la question…";
+
+    const url = `${BASE}?action=entre2_question`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.ok) {
+      statusEl.textContent = `Erreur: ${data.error}`;
+      return;
+    }
+
+    aff.textContent = data.affirmation;
+    qid.textContent = `qId: ${data.qId}`;
+    unit = data.unitGroup || "";
+    unitPill.textContent = `unit: ${unit || "-"}`;
+
+    const sg = Number(data.scaleGroup || 1);
+    scalePill.textContent = `scale: ${sg}`;
+
+    cfg = configForScaleGroup(sg);
+    const ticks = buildTicks(cfg);
+    ticksEl.textContent = `Crans: ${ticks.join(" · ")}`;
+
+    setSliders(cfg);
+    sync();
+
+    statusEl.textContent = "Prêt ✅";
+  }
+
+  loadQuestion();
+</script>
+</body>
+</html>
