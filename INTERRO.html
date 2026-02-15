@@ -46,7 +46,7 @@
   const WRITE_TOKEN = "YUKI";
   
   const params = new URLSearchParams(location.search);
-  const gameId = (params.get("game") || "").trim();
+  const gameId = (localStorage.getItem("mash_sessionId") || "").trim();
   
   const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
   localStorage.setItem("mash_playerId", playerId);
