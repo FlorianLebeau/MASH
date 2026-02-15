@@ -304,20 +304,23 @@
   });
 
 function validateStart() {
-  const nameOk = playerNameInput.value.trim().length > 0;
-  const sessionOk = sessionId && sessionId.length > 0;
+  const name = playerNameInput.value.trim();
+  const nameOk = name.length > 0;
+  const sessionOk = !!sessionId;
 
-  startBtn.disabled = !(nameOk && sessionOk);
+  const canStart = nameOk && sessionOk;
 
-  if (!sessionOk) {
-    startHint.textContent = "Aucune session sélectionnée (retour Home)";
-  } else if (!nameOk) {
-    startHint.textContent = "Entre un pseudo";
-  } else {
-    startHint.textContent = "";
-  }
+  console.log("[ENTRE2] validateStart", { name, nameOk, sessionId, sessionOk, canStart });
+
+  startBtn.disabled = !canStart;
+
+  if (!sessionOk) startHint.textContent = "Aucune session sélectionnée (retour Home)";
+  else if (!nameOk) startHint.textContent = "Entre un pseudo";
+  else startHint.textContent = "";
 }
 
+  playerNameInput.addEventListener("input", validateStart);
+  validateStart();
 
   function jsonp(url) {
   return new Promise((resolve, reject) => {
