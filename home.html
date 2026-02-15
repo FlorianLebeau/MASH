@@ -5,81 +5,132 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>MASH — Home</title>
   <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;max-width:820px}
-    .card{padding:16px;border:1px solid #ddd;border-radius:14px;margin:12px 0}
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;max-width:920px}
     .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    input{padding:10px;border-radius:10px;border:1px solid #ccc;min-width:260px}
-    a.btn,button{display:inline-block;padding:10px 14px;border-radius:12px;border:0;cursor:pointer;text-decoration:none}
-    a.btn{border:1px solid #ddd}
+    .card{padding:16px;border:1px solid #ddd;border-radius:14px;margin:12px 0}
+    .pill{display:inline-block;padding:6px 10px;border:1px solid #ddd;border-radius:999px}
     .muted{opacity:.7}
-    h1{margin-bottom:6px}
+    button,a.btn{display:inline-block;padding:10px 14px;border-radius:12px;border:1px solid #ddd;background:#fff;cursor:pointer;text-decoration:none}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    h1{margin:0 0 6px}
+    .sessionTitle{font-weight:800;font-size:18px;margin:0 0 8px}
   </style>
 </head>
 <body>
   <h1>MASH</h1>
-  <p class="muted">Choisis un jeu / une page. (D’autres modes seront ajoutés ici.)</p>
+  <p class="muted">Choisis une session, puis un jeu.</p>
 
-  <div class="card">
-    <label for="gameId" style="display:block;font-weight:700;margin-bottom:6px;">Game ID</label>
-    <div class="row">
-      <input id="gameId" placeholder="Ex: ABCD1234" />
-      <button id="save">Enregistrer</button>
-      <span class="muted" id="saved"></span>
-    </div>
+  <div class="row">
+    <span class="pill" id="sessionPill">Session: -</span>
+    <button id="clearSession">Effacer session</button>
+    <span class="muted" id="status"></span>
   </div>
 
-  <div class="card">
-    <h2 style="margin-top:0;">Jeux</h2>
-    <div class="row">
-      <a class="btn" id="playLink" href="#">▶️ Lancer le Quiz (joueur)</a>
-      <a class="btn" id="resultsLink" href="#">🏆 Voir les Résultats</a>
-    </div>
-    <p class="muted" id="hint" style="margin-bottom:0;"></p>
-  </div>
+  <div id="sessionsRoot"></div>
 
 <script>
-  const input = document.getElementById("gameId");
-  const saved = document.getElementById("saved");
-  const hint = document.getElementById("hint");
+  const BASE = "COLLE_ICI_TON_URL_APPS_SCRIPT"; // .../exec
 
-  const playLink = document.getElementById("playLink");
-  const resultsLink = document.getElementById("resultsLink");
+  const sessionsRoot = document.getElementById("sessionsRoot");
+  const sessionPill = document.getElementById("sessionPill");
+  const statusEl = document.getElementById("status");
 
-  function updateLinks() {
-    const game = (input.value || "").trim();
-    if (!game) {
-      playLink.href = "#";
-      resultsLink.href = "#";
-      hint.textContent = "Renseigne un Game ID pour activer les liens.";
-      return;
-    }
-    playLink.href = `./index.html?game=${encodeURIComponent(game)}`;
-    resultsLink.href = `./results.html?game=${encodeURIComponent(game)}`;
-    hint.textContent = "";
+  const KEY_SESSION = "mash_sessionId";
+
+  function setStatus(msg){ statusEl.textContent = msg || ""; }
+
+  function getSession(){ return (localStorage.getItem(KEY_SESSION) || "").trim(); }
+  function setSession(id){
+    localStorage.setItem(KEY_SESSION, id);
+    sessionPill.textContent = `Session: ${id}`;
+  }
+  function clearSession(){
+    localStorage.removeItem(KEY_SESSION);
+    sessionPill.textContent = "Session: -";
   }
 
-  // Load last used gameId
-  const last = localStorage.getItem("mash_last_gameId") || "";
-  input.value = last;
-  updateLinks();
-
-  input.addEventListener("input", updateLinks);
-
-  document.getElementById("save").addEventListener("click", () => {
-    const game = (input.value || "").trim();
-    if (!game) return;
-    localStorage.setItem("mash_last_gameId", game);
-    saved.textContent = "✓ enregistré";
-    setTimeout(() => saved.textContent = "", 1500);
-    updateLinks();
+  document.getElementById("clearSession").addEventListener("click", () => {
+    clearSession();
   });
 
-  // Prevent navigation if missing
-  [playLink, resultsLink].forEach(a => {
-    a.addEventListener("click", (e) => {
-      if (!a.href || a.getAttribute("href") === "#") e.preventDefault();
+  function routeForGameName(gameName){
+    const g = (gameName || "").toUpperCase().trim();
+    if (g === "INTERRO") return "./index.html";     // page quiz existante
+    if (g === "ENTRE2")  return "./entre2.html";
+    // fallback : plus tard
+    return "#";
+  }
+
+  function renderSessions(sessions){
+    sessionsRoot.innerHTML = "";
+
+    if (!sessions || sessions.length === 0){
+      const d = document.createElement("div");
+      d.className = "card";
+      d.textContent = "Aucune session OPEN trouvée.";
+      sessionsRoot.appendChild(d);
+      return;
+    }
+
+    sessions.forEach(s => {
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const title = document.createElement("div");
+      title.className = "sessionTitle";
+      title.textContent = `Session ${s.sessionId}`;
+      card.appendChild(title);
+
+      const row = document.createElement("div");
+      row.className = "row";
+
+      s.games.forEach(g => {
+        const btn = document.createElement("button");
+        btn.textContent = `${g.game}`;
+        btn.title = `status: ${g.status}${g.expectedPlayers ? " | joueurs: "+g.expectedPlayers : ""}`;
+
+        const href = routeForGameName(g.game);
+        btn.disabled = (href === "#") || (g.status !== "OPEN");
+
+        btn.addEventListener("click", () => {
+          setSession(s.sessionId);
+          // redirection sans SessionID dans l’URL
+          location.href = href;
+        });
+
+        row.appendChild(btn);
+      });
+
+      card.appendChild(row);
+      sessionsRoot.appendChild(card);
     });
-  });
+  }
+
+  async function load(){
+    const current = getSession();
+    sessionPill.textContent = current ? `Session: ${current}` : "Session: -";
+
+    setStatus("Chargement des sessions…");
+    try{
+      const url = `${BASE}?action=sessions&openOnly=1`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!data.ok){
+        setStatus(`Erreur: ${data.error}`);
+        return;
+      }
+
+      renderSessions(data.sessions);
+      setStatus("");
+    }catch(e){
+      console.warn(e);
+      setStatus("Erreur réseau ou URL BASE incorrecte.");
+    }
+  }
+
+  load();
 </script>
 </body>
 </html>
+
