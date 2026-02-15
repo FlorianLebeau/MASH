@@ -10,148 +10,102 @@
     .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
     .pill{display:inline-block;padding:6px 10px;border:1px solid #ddd;border-radius:999px}
     .muted{opacity:.7}
-    input[type="range"]{width:100%}
-    .rangeWrap{position:relative}
-    
-.sliderBox{
-  position:relative;
-  height:56px;
-  margin-top:12px;
-}
+    button{padding:10px 14px;border-radius:12px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    input[type="text"]{padding:10px;border-radius:10px;border:1px solid #ccc;min-width:260px}
 
-.track{
-  position:absolute;
-  left:0; right:0;
-  top:26px;
-  height:6px;
-  border-radius:999px;
-  background:#e6e6e6;
-}
+    .sliderBox{position:relative;height:56px;margin-top:12px;}
+    .track{position:absolute;left:0; right:0;top:26px;height:6px;border-radius:999px;background:#e6e6e6;}
+    .range{position:absolute;top:26px;height:6px;border-radius:999px;background:#111;left:0%;right:0%;}
+    .thumb{pointer-events:none;position:absolute;left:0; right:0;top:14px;width:100%;height:32px;margin:0;background:transparent;-webkit-appearance:none;appearance:none;}
+    .thumb::-webkit-slider-runnable-track{height:6px;background:transparent;}
+    .thumb::-moz-range-track{height:6px;background:transparent;}
+    .thumb::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;appearance:none;height:20px;width:20px;border-radius:50%;border:2px solid #111;background:#fff;cursor:pointer;margin-top:-7px;}
+    .thumb::-moz-range-thumb{pointer-events:auto;height:20px;width:20px;border-radius:50%;border:2px solid #111;background:#fff;cursor:pointer;}
 
-.range{
-  position:absolute;
-  top:26px;
-  height:6px;
-  border-radius:999px;
-  background:#111; /* tu peux changer */
-  left:0%;
-  right:0%;
-}
-
-.thumb{
-  pointer-events:none; /* on réactive sur le thumb via pseudo elements */
-  position:absolute;
-  left:0; right:0;
-  top:14px;
-  width:100%;
-  height:32px;
-  margin:0;
-  background:transparent;
-  -webkit-appearance:none;
-  appearance:none;
-}
-
-.thumb::-webkit-slider-runnable-track{ height:6px; background:transparent; }
-.thumb::-moz-range-track{ height:6px; background:transparent; }
-
-.thumb::-webkit-slider-thumb{
-  pointer-events:auto;
-  -webkit-appearance:none;
-  appearance:none;
-  height:20px;
-  width:20px;
-  border-radius:50%;
-  border:2px solid #111;
-  background:#fff;
-  cursor:pointer;
-  margin-top:-7px; /* aligne le thumb sur la track */
-}
-
-.thumb::-moz-range-thumb{
-  pointer-events:auto;
-  height:20px;
-  width:20px;
-  border-radius:50%;
-  border:2px solid #111;
-  background:#fff;
-  cursor:pointer;
-}
-
-/* Petits crans */
-.ticks{
-  position:absolute;
-  left:0; right:0;
-  top:2px;
-  height:18px;
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  pointer-events:none;
-}
-
-.tick{
-  position:relative;
-  width:1px;
-  height:10px;
-  background:#777;
-  opacity:.9;
-}
-
-.tickLabel{
-  position:absolute;
-  top:10px;
-  left:50%;
-  transform:translateX(-50%);
-  font-size:11px;
-  opacity:.7;
-  white-space:nowrap;
-}
+    .ticks{position:absolute;left:0; right:0;top:2px;height:18px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;}
+    .tick{position:relative;width:1px;height:10px;background:#777;opacity:.9;}
+    .tickLabel{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:11px;opacity:.7;white-space:nowrap;}
   </style>
 </head>
+
 <body>
   <h1>ENTRE2</h1>
 
   <div class="row">
+    <span class="pill" id="qPill">Q: -/10</span>
     <span class="pill" id="scalePill">scale: -</span>
     <span class="pill" id="unitPill">unit: -</span>
-  </div>
-
-  <div class="card">
-    <div id="aff" style="font-weight:800;font-size:18px;">Chargement…</div>
-    <div class="muted" id="qid" style="margin-top:6px;"></div>
-  </div>
-
-<div class="card">
-  <div style="font-weight:700;margin-bottom:10px;">Choisis ton intervalle</div>
-
-  <div class="sliderBox">
-    <div class="ticks" id="ticksBar"></div>
-
-    <div class="track"></div>
-    <div class="range" id="rangeFill"></div>
-
-    <!-- 2 sliders superposés -->
-    <input id="minR" class="thumb thumb--left" type="range" />
-    <input id="maxR" class="thumb thumb--right" type="range" />
-  </div>
-
-  <div class="row" style="margin-top:12px;">
     <span class="pill" id="intervalPill">intervalle: -</span>
   </div>
-</div>
+
+  <!-- START -->
+  <div class="card" id="startCard">
+    <div style="font-weight:700;margin-bottom:10px;">Avant de commencer</div>
+    <div class="row">
+      <input id="playerName" type="text" placeholder="Ton pseudo" />
+      <button id="startBtn" disabled>Commencer</button>
+      <span class="muted" id="startHint"></span>
+    </div>
+  </div>
+
+  <!-- QUESTION -->
+  <div id="gameArea" style="display:none;">
+    <div class="card">
+      <div id="aff" style="font-weight:800;font-size:18px;">—</div>
+      <div class="muted" id="qid" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:700;margin-bottom:10px;">Choisis ton intervalle</div>
+
+      <div class="sliderBox">
+        <div class="ticks" id="ticksBar"></div>
+
+        <div class="track"></div>
+        <div class="range" id="rangeFill"></div>
+
+        <input id="minR" class="thumb thumb--left" type="range" />
+        <input id="maxR" class="thumb thumb--right" type="range" />
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <button id="nextBtn">Suivant</button>
+        <span class="muted" id="nextHint"></span>
+      </div>
+    </div>
+  </div>
 
   <p class="muted" id="status"></p>
 
-  
 <script>
-  const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec"; // .../exec
+  const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec";
+  const WRITE_TOKEN = "YUKI"; // <-- mets "" si tu n'utilises pas de token
+  const QUESTIONS_PER_ROUND = 10;
+  const TICKS_COUNT = 10; // doit matcher ENTRE2_TICKS_COUNT côté Apps Script
 
-const aff = document.getElementById("aff");
+  const params = new URLSearchParams(location.search);
+  const gameId = (params.get("game") || "").trim();
+
+  const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
+  localStorage.setItem("mash_playerId", playerId);
+
+  const qPill = document.getElementById("qPill");
+  const aff = document.getElementById("aff");
   const qid = document.getElementById("qid");
   const scalePill = document.getElementById("scalePill");
   const unitPill = document.getElementById("unitPill");
   const intervalPill = document.getElementById("intervalPill");
   const statusEl = document.getElementById("status");
+
+  const startCard = document.getElementById("startCard");
+  const gameArea = document.getElementById("gameArea");
+  const playerNameInput = document.getElementById("playerName");
+  const startBtn = document.getElementById("startBtn");
+  const startHint = document.getElementById("startHint");
+
+  const nextBtn = document.getElementById("nextBtn");
+  const nextHint = document.getElementById("nextHint");
 
   const minR = document.getElementById("minR");
   const maxR = document.getElementById("maxR");
@@ -161,75 +115,134 @@ const aff = document.getElementById("aff");
   let unit = "";
   let cfg = null;
 
- const TICKS_COUNT = 10; // ✅ exactement 10 crans visibles
+  let currentPlayerName = "";
+  let askedQids = [];
+  let collected = []; // {qId,min,max}
+  let currentQ = null;
+  let qNum = 0;
 
-function parseScaleGroup(raw) {
-  // accepte 1/2/3, "1", "G1", "10-100", "entre 10 et 100", etc.
-  const s = String(raw ?? "").toLowerCase().trim();
+  function setStatus(msg){ statusEl.textContent = msg || ""; }
 
-  const n = Number(s);
-  if (Number.isFinite(n) && (n === 1 || n === 2 || n === 3)) return n;
+  function parseScaleGroup(raw) {
+    const s = String(raw ?? "").toLowerCase().trim();
+    const n = Number(s);
+    if (Number.isFinite(n) && (n === 1 || n === 2 || n === 3)) return n;
 
-  if (s.includes("1") && s.includes("10")) return 1;
-  if (s.includes("10") && s.includes("100") && !s.includes("1000")) return 2;
-  if (s.includes("100") && s.includes("1000")) return 3;
+    if (s.includes("1") && s.includes("10")) return 1;
+    if (s.includes("10") && s.includes("100") && !s.includes("1000")) return 2;
+    if (s.includes("100") && s.includes("1000")) return 3;
+    return 1;
+  }
 
-  // fallback
-  return 1;
-}
+  function configForScaleGroup(rawGroup) {
+    const g = parseScaleGroup(rawGroup);
 
-  const params = new URLSearchParams(location.search);
-const gameId = (params.get("game") || "").trim();
+    let min, max;
+    if (g === 1) { min = 1;   max = 10; }
+    if (g === 2) { min = 10;  max = 100; }
+    if (g === 3) { min = 100; max = 1000; }
 
-const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
-localStorage.setItem("mash_playerId", playerId);
+    const step = (max - min) / (TICKS_COUNT - 1);
+    const stepInt = Math.round(step);
 
-let currentPlayerName = "";
-let askedQids = [];
-let collected = []; // {qId,min,max}
-let currentQ = null;
-let qNum = 0;
+    return { group: g, min, max, step: stepInt, ticksCount: TICKS_COUNT };
+  }
 
-async function loadNextQuestion() {
-  qNum += 1;
-  statusEl.textContent = `Question ${qNum}/10…`;
+  function buildTicks({min, step, ticksCount}) {
+    const out = [];
+    for (let i = 0; i < ticksCount; i++) out.push(min + i * step);
+    return out;
+  }
 
-  const exclude = askedQids.join(",");
-  const url = `${BASE}?action=entre2_question&exclude=${encodeURIComponent(exclude)}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (!data.ok) { statusEl.textContent = `Erreur: ${data.error}`; return; }
+  function renderTicks(cfg) {
+    const ticks = buildTicks(cfg);
+    ticksBar.innerHTML = "";
+    ticks.forEach((t, idx) => {
+      const tick = document.createElement("div");
+      tick.className = "tick";
+      const showLabel = (idx === 0) || (idx === ticks.length - 1);
+      if (showLabel) {
+        const lab = document.createElement("div");
+        lab.className = "tickLabel";
+        lab.textContent = String(t);
+        tick.appendChild(lab);
+      }
+      ticksBar.appendChild(tick);
+    });
+  }
 
-  currentQ = data;
-  askedQids.push(data.qId);
+  function setSliders({min, max, step}) {
+    [minR, maxR].forEach(r => { r.min = min; r.max = max; r.step = step; });
+    minR.value = min;
+    maxR.value = max;
+  }
 
-  // re-render question + slider config (tu as déjà ça)
-  aff.textContent = data.affirmation;
-  unit = data.unitGroup || "";
-  unitPill.textContent = `unit: ${unit || "-"}`;
+  function clampAndSync(which) {
+    let a = Number(minR.value);
+    let b = Number(maxR.value);
 
-  cfg = configForScaleGroup(data.scaleGroup);
-  scalePill.textContent = `scale: ${cfg.group}`;
-  renderTicks(cfg);
-  setSliders(cfg);
-  clampAndSync("min");
+    if (a > b) {
+      if (which === "min") b = a;
+      else a = b;
+      minR.value = a;
+      maxR.value = b;
+    }
 
-  statusEl.textContent = `Question ${qNum}/10 ✅`;
-}
+    const min = Number(minR.min);
+    const max = Number(minR.max);
+    const leftPct = ((a - min) / (max - min)) * 100;
+    const rightPct = 100 - ((b - min) / (max - min)) * 100;
 
-function captureCurrentInterval() {
-  const a = Number(minR.value);
-  const b = Number(maxR.value);
-  return { min: Math.min(a,b), max: Math.max(a,b) };
-}
+    rangeFill.style.left = `${leftPct}%`;
+    rangeFill.style.right = `${rightPct}%`;
 
-// bouton suivant
-async function onNext() {
-  const {min,max} = captureCurrentInterval();
-  collected.push({ qId: currentQ.qId, min, max });
+    intervalPill.textContent = `intervalle: ${a} – ${b} ${unit}`.trim();
+  }
 
-  if (qNum >= 10) {
-    // submit
+  minR.addEventListener("input", () => clampAndSync("min"));
+  maxR.addEventListener("input", () => clampAndSync("max"));
+
+  function captureCurrentInterval() {
+    const a = Number(minR.value);
+    const b = Number(maxR.value);
+    return { min: Math.min(a,b), max: Math.max(a,b) };
+  }
+
+  async function loadNextQuestion() {
+    qNum += 1;
+    qPill.textContent = `Q: ${qNum}/${QUESTIONS_PER_ROUND}`;
+    setStatus(`Chargement question ${qNum}/${QUESTIONS_PER_ROUND}…`);
+
+    const exclude = askedQids.join(",");
+    const url = `${BASE}?action=entre2_question&exclude=${encodeURIComponent(exclude)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.ok) { setStatus(`Erreur: ${data.error}`); return; }
+
+    currentQ = data;
+    askedQids.push(data.qId);
+
+    aff.textContent = data.affirmation;
+    qid.textContent = `qId: ${data.qId}`;
+
+    unit = data.unitGroup || "";
+    unitPill.textContent = `unit: ${unit || "-"}`;
+
+    cfg = configForScaleGroup(data.scaleGroup);
+    scalePill.textContent = `scale: ${cfg.group}`;
+
+    renderTicks(cfg);
+    setSliders(cfg);
+    clampAndSync("min");
+
+    nextBtn.textContent = (qNum >= QUESTIONS_PER_ROUND) ? "Terminer" : "Suivant";
+    setStatus(`Question ${qNum}/${QUESTIONS_PER_ROUND} ✅`);
+  }
+
+  async function submitRound() {
+    setStatus("Envoi des réponses…");
+
     const payload = {
       action: "entre2_submit",
       token: WRITE_TOKEN,
@@ -246,133 +259,54 @@ async function onNext() {
     });
 
     const out = await res.json();
-    if (!out.ok) { statusEl.textContent = `Erreur submit: ${out.error}`; return; }
+    if (!out.ok) { setStatus(`Erreur submit: ${out.error}`); return; }
 
-    statusEl.textContent = `Terminé ✅ Score: ${out.score20} / 20`;
-    // (optionnel) afficher détails out.perQuestion
-    return;
+    // Lock UI
+    nextBtn.disabled = true;
+    minR.disabled = true;
+    maxR.disabled = true;
+
+    setStatus(`Terminé ✅ Score: ${out.score20} / 20`);
   }
 
-  await loadNextQuestion();
-}
-function configForScaleGroup(rawGroup) {
-  const g = parseScaleGroup(rawGroup);
+  nextBtn.addEventListener("click", async () => {
+    if (!currentQ) return;
 
-  let min, max;
-  if (g === 1) { min = 1;   max = 10; }
-  if (g === 2) { min = 10;  max = 100; }
-  if (g === 3) { min = 100; max = 1000; }
+    const {min, max} = captureCurrentInterval();
+    collected.push({ qId: currentQ.qId, min, max });
 
-  // ✅ step calculé pour avoir EXACTEMENT 10 crans (10 positions)
-  const step = (max - min) / (TICKS_COUNT - 1);
-
-  // sécurité : on veut des entiers propres ici
-  const stepInt = Math.round(step);
-  return { group: g, min, max, step: stepInt, ticksCount: TICKS_COUNT };
-}
-
-function buildTicks({min, step, ticksCount}) {
-  const out = [];
-  for (let i = 0; i < ticksCount; i++) {
-    out.push(min + i * step);
-  }
-  return out;
-}
-
-function setSliders({min, max, step}) {
-  [minR, maxR].forEach(r => {
-    r.min = min;
-    r.max = max;
-    r.step = step;   // ✅ snap sur les 10 crans
+    if (qNum >= QUESTIONS_PER_ROUND) {
+      await submitRound();
+    } else {
+      await loadNextQuestion();
+    }
   });
 
-  // ✅ initial: extrémités
-  minR.value = min;
-  maxR.value = max;
-}
+  function validateStart() {
+    const ok = playerNameInput.value.trim().length > 0 && !!gameId;
+    startBtn.disabled = !ok;
+    startHint.textContent = !gameId ? "Ajoute ?game=XXXX dans l’URL" : (ok ? "" : "Entre un pseudo");
+  }
 
-function renderTicks(cfg) {
-  const ticks = buildTicks(cfg);
+  playerNameInput.addEventListener("input", validateStart);
 
-  ticksBar.innerHTML = "";
-  ticks.forEach((t, idx) => {
-    const tick = document.createElement("div");
-    tick.className = "tick";
+  startBtn.addEventListener("click", async () => {
+    currentPlayerName = playerNameInput.value.trim();
+    startCard.style.display = "none";
+    gameArea.style.display = "block";
 
-    // Labels : extrémités + milieu (tu peux changer si tu veux tout afficher)
-    const showLabel = (idx === 0) || (idx === ticks.length - 1);  // || (idx === Math.floor(ticks.length / 2));
-    if (showLabel) {
-      const lab = document.createElement("div");
-      lab.className = "tickLabel";
-      lab.textContent = String(t);
-      tick.appendChild(lab);
-    }
+    // init
+    askedQids = [];
+    collected = [];
+    currentQ = null;
+    qNum = 0;
 
-    ticksBar.appendChild(tick);
+    await loadNextQuestion();
   });
-}
 
-  function clampAndSync(which) {
-    let a = Number(minR.value);
-    let b = Number(maxR.value);
-
-    // Empêche l’inversion
-    if (a > b) {
-      if (which === "min") b = a;
-      else a = b;
-      minR.value = a;
-      maxR.value = b;
-    }
-
-    // Remplissage visuel (en %)
-    const min = Number(minR.min);
-    const max = Number(minR.max);
-    const leftPct = ((a - min) / (max - min)) * 100;
-    const rightPct = 100 - ((b - min) / (max - min)) * 100;
-
-    rangeFill.style.left = `${leftPct}%`;
-    rangeFill.style.right = `${rightPct}%`;
-
-    intervalPill.textContent = `intervalle: ${a} – ${b} ${unit}`.trim();
-  }
-
-
-  minR.addEventListener("input", () => clampAndSync("min"));
-  maxR.addEventListener("input", () => clampAndSync("max"));
-
-  async function loadQuestion() {
-    statusEl.textContent = "Chargement de la question…";
-
-    const url = `${BASE}?action=entre2_question`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (!data.ok) {
-      statusEl.textContent = `Erreur: ${data.error}`;
-      return;
-    }
-
-    aff.textContent = data.affirmation;
-    qid.textContent = `qId: ${data.qId}`;
-
-    unit = data.unitGroup || "";
-    unitPill.textContent = `unit: ${unit || "-"}`;
-
-    const sg = Number(data.scaleGroup || 1);
-    scalePill.textContent = `scale: ${sg}`;
-
-    cfg = configForScaleGroup(data.scaleGroup);
-    scalePill.textContent = `scale: ${cfg.group}`;
-    
-    renderTicks(cfg);
-    setSliders(cfg);
-    clampAndSync("min");
-
-    statusEl.textContent = "Prêt ✅";
-  }
-
-  loadQuestion();
-
+  // init
+  validateStart();
+  if (!gameId) setStatus("Lien invalide : ajoute ?game=XXXX");
 </script>
 </body>
 </html>
