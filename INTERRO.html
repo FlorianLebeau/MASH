@@ -45,8 +45,7 @@
   const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec";
   const WRITE_TOKEN = "YUKI";
   
-  const params = new URLSearchParams(location.search);
-  const gameId = (localStorage.getItem("mash_sessionId") || "").trim();
+  const sessionId = (localStorage.getItem("mash_sessionId") || "").trim();
   
   const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
   localStorage.setItem("mash_playerId", playerId);
