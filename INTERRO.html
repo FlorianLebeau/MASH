@@ -128,14 +128,54 @@
   
     const payload = {
       token: WRITE_TOKEN,
-      sessionId,
-      game: gameName,
+      sessionId,          // ✅
+      game: gameName,     // ✅ "INTERRO"
       playerId,
       playerName,
       answers,
       userAgent: navigator.userAgent,
       autoSubmit: auto
     };
+  
+    try {
+      setStatus("Envoi en cours…");
+  
+      const res = await fetch(BASE, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+      });
+  
+      const raw = await res.text(); // ✅ toujours lire le texte
+      let data = null;
+      try { data = JSON.parse(raw); } catch (_) {}
+  
+      if (!res.ok) {
+        setStatus(`Erreur HTTP ${res.status}. Réponse: ${raw.slice(0,200)}`);
+        return;
+      }
+  
+      if (!data) {
+        setStatus(`Réponse non-JSON du serveur: ${raw.slice(0,200)}`);
+        return;
+      }
+  
+      if (!data.ok) {
+        setStatus(`Erreur serveur: ${data.error || "unknown"} (${raw.slice(0,200)})`);
+        return;
+      }
+  
+      // ✅ succès réel
+      setStatus(`Réponses envoyées ✅ (score: ${data.score ?? 0})`);
+      if (timerInterval) clearInterval(timerInterval);
+      lockQuiz("Réponses envoyées ✅");
+  
+    } catch (e) {
+      console.warn(e);
+      setStatus("Erreur réseau / CORS sur POST ❌ (voir console)");
+    }
+  }
+
 
   
     try {
