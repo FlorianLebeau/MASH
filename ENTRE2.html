@@ -161,30 +161,79 @@ const aff = document.getElementById("aff");
   let unit = "";
   let cfg = null;
 
-  function configForScaleGroup(g) {
-    if (g === 1) return { min: 1, max: 10, step: 1 };
-    if (g === 2) return { min: 10, max: 100, step: 10 };
-    if (g === 3) return { min: 100, max: 1000, step: 100 };
-    return { min: 1, max: 10, step: 1 };
-  }
+ const TICKS_COUNT = 10; // ✅ exactement 10 crans visibles
 
-  function buildTicks({min,max,step}) {
-    const out = [];
-    for (let v = min; v <= max; v += step) out.push(v);
-    return out;
-  }
+function parseScaleGroup(raw) {
+  // accepte 1/2/3, "1", "G1", "10-100", "entre 10 et 100", etc.
+  const s = String(raw ?? "").toLowerCase().trim();
 
-  function setSliders({min,max,step}) {
-    [minR, maxR].forEach(r => {
-      r.min = min;
-      r.max = max;
-      r.step = step;
-    });
+  const n = Number(s);
+  if (Number.isFinite(n) && (n === 1 || n === 2 || n === 3)) return n;
 
-    // ✅ initial: extrémités
-    minR.value = min;
-    maxR.value = max;
+  if (s.includes("1") && s.includes("10")) return 1;
+  if (s.includes("10") && s.includes("100") && !s.includes("1000")) return 2;
+  if (s.includes("100") && s.includes("1000")) return 3;
+
+  // fallback
+  return 1;
+}
+
+function configForScaleGroup(rawGroup) {
+  const g = parseScaleGroup(rawGroup);
+
+  let min, max;
+  if (g === 1) { min = 1;   max = 10; }
+  if (g === 2) { min = 10;  max = 100; }
+  if (g === 3) { min = 100; max = 1000; }
+
+  // ✅ step calculé pour avoir EXACTEMENT 10 crans (10 positions)
+  const step = (max - min) / (TICKS_COUNT - 1);
+
+  // sécurité : on veut des entiers propres ici
+  const stepInt = Math.round(step);
+  return { group: g, min, max, step: stepInt, ticksCount: TICKS_COUNT };
+}
+
+function buildTicks({min, step, ticksCount}) {
+  const out = [];
+  for (let i = 0; i < ticksCount; i++) {
+    out.push(min + i * step);
   }
+  return out;
+}
+
+function setSliders({min, max, step}) {
+  [minR, maxR].forEach(r => {
+    r.min = min;
+    r.max = max;
+    r.step = step;   // ✅ snap sur les 10 crans
+  });
+
+  // ✅ initial: extrémités
+  minR.value = min;
+  maxR.value = max;
+}
+
+function renderTicks(cfg) {
+  const ticks = buildTicks(cfg);
+
+  ticksBar.innerHTML = "";
+  ticks.forEach((t, idx) => {
+    const tick = document.createElement("div");
+    tick.className = "tick";
+
+    // Labels : extrémités + milieu (tu peux changer si tu veux tout afficher)
+    const showLabel = (idx === 0) || (idx === ticks.length - 1) || (idx === Math.floor(ticks.length / 2));
+    if (showLabel) {
+      const lab = document.createElement("div");
+      lab.className = "tickLabel";
+      lab.textContent = String(t);
+      tick.appendChild(lab);
+    }
+
+    ticksBar.appendChild(tick);
+  });
+}
 
   function clampAndSync(which) {
     let a = Number(minR.value);
@@ -210,25 +259,6 @@ const aff = document.getElementById("aff");
     intervalPill.textContent = `intervalle: ${a} – ${b} ${unit}`.trim();
   }
 
-  function renderTicks(cfg) {
-    const ticks = buildTicks(cfg);
-
-    ticksBar.innerHTML = "";
-    ticks.forEach((t, idx) => {
-      const tick = document.createElement("div");
-      tick.className = "tick";
-
-      // Labels: pour ne pas surcharger, on labelise extrémités + milieu
-      const showLabel = (idx === 0) || (idx === ticks.length - 1) || (idx === Math.floor(ticks.length / 2));
-      if (showLabel) {
-        const lab = document.createElement("div");
-        lab.className = "tickLabel";
-        lab.textContent = String(t);
-        tick.appendChild(lab);
-      }
-      ticksBar.appendChild(tick);
-    });
-  }
 
   minR.addEventListener("input", () => clampAndSync("min"));
   maxR.addEventListener("input", () => clampAndSync("max"));
@@ -254,7 +284,9 @@ const aff = document.getElementById("aff");
     const sg = Number(data.scaleGroup || 1);
     scalePill.textContent = `scale: ${sg}`;
 
-    cfg = configForScaleGroup(sg);
+    cfg = configForScaleGroup(data.scaleGroup);
+    scalePill.textContent = `scale: ${cfg.group}`;
+    
     renderTicks(cfg);
     setSliders(cfg);
     clampAndSync("min");
@@ -264,37 +296,6 @@ const aff = document.getElementById("aff");
 
   loadQuestion();
 
-  async function loadQuestion() {
-    statusEl.textContent = "Chargement de la question…";
-
-    const url = `${BASE}?action=entre2_question`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (!data.ok) {
-      statusEl.textContent = `Erreur: ${data.error}`;
-      return;
-    }
-
-    aff.textContent = data.affirmation;
-    qid.textContent = `qId: ${data.qId}`;
-    unit = data.unitGroup || "";
-    unitPill.textContent = `unit: ${unit || "-"}`;
-
-    const sg = Number(data.scaleGroup || 1);
-    scalePill.textContent = `scale: ${sg}`;
-
-    cfg = configForScaleGroup(sg);
-    const ticks = buildTicks(cfg);
-    ticksEl.textContent = `Crans: ${ticks.join(" · ")}`;
-
-    setSliders(cfg);
-    sync();
-
-    statusEl.textContent = "Prêt ✅";
-  }
-
-  loadQuestion();
 </script>
 </body>
 </html>
