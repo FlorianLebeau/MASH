@@ -120,7 +120,7 @@
     return await jsonp(url);
   }
   
-  async function submit(auto=false) {
+  async function submit(auto = false) {
     if (!quiz || locked) return;
   
     const playerName = elPlayerName.value.trim();
@@ -146,64 +146,34 @@
         body: JSON.stringify(payload),
       });
   
-      const raw = await res.text(); // ✅ toujours lire le texte
+      const raw = await res.text(); // ✅ pas de res.json() direct
       let data = null;
       try { data = JSON.parse(raw); } catch (_) {}
   
       if (!res.ok) {
-        setStatus(`Erreur HTTP ${res.status}. Réponse: ${raw.slice(0,200)}`);
+        setStatus(`Erreur HTTP ${res.status}. Réponse: ${raw.slice(0, 200)}`);
         return;
       }
   
       if (!data) {
-        setStatus(`Réponse non-JSON du serveur: ${raw.slice(0,200)}`);
+        setStatus(`Réponse non-JSON: ${raw.slice(0, 200)}`);
         return;
       }
   
       if (!data.ok) {
-        setStatus(`Erreur serveur: ${data.error || "unknown"} (${raw.slice(0,200)})`);
+        setStatus(`Erreur serveur: ${data.error || "unknown"}`);
         return;
       }
   
-      // ✅ succès réel
       setStatus(`Réponses envoyées ✅ (score: ${data.score ?? 0})`);
       if (timerInterval) clearInterval(timerInterval);
       lockQuiz("Réponses envoyées ✅");
-  
     } catch (e) {
       console.warn(e);
-      setStatus("Erreur réseau / CORS sur POST ❌ (voir console)");
+      setStatus("Erreur réseau / blocage POST ❌ (voir console)");
     }
   }
 
-
-  
-    try {
-      const res = await fetch(BASE, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload),
-      });
-  
-      // lecture JSON (peut échouer parfois, mais on essaye)
-      let data = null;
-      try { data = await res.json(); } catch (_) {}
-  
-      if (data && data.ok) {
-        setStatus(`Réponses envoyées ✅ (score: ${data.score ?? 0})`);
-        // verrouille après envoi (pour éviter double envoi)
-        if (timerInterval) clearInterval(timerInterval);
-        lockQuiz("Réponses envoyées ✅");
-      } else {
-        setStatus("Envoi effectué ✅ (vérifie la sheet si besoin)");
-        if (timerInterval) clearInterval(timerInterval);
-        lockQuiz("Réponses envoyées ✅");
-      }
-    } catch (e) {
-      setStatus("Erreur d’envoi ❌ (réessaie)");
-      console.warn(e);
-    }
-  }
   
   function startTimer(timeLimitSec) {
     remaining = Number(timeLimitSec || 0);
