@@ -46,6 +46,16 @@
   const WRITE_TOKEN = "YUKI";
   
   const sessionId = (localStorage.getItem("mash_sessionId") || "").trim();
+  const gameName = "INTERRO";
+
+  if (!sessionId) {
+  document.body.innerHTML = `
+    <h1>INTERRO</h1>
+    <p>Lien invalide : aucune session sélectionnée.</p>
+    <p>Retourne sur la Home et choisis une session.</p>
+  `;
+  throw new Error("Missing sessionId in localStorage");
+}
   
   const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
   localStorage.setItem("mash_playerId", playerId);
@@ -64,7 +74,7 @@
   const elSend = document.getElementById("send");
   const elStatus = document.getElementById("status");
   
-  elGamePill.textContent = `game: ${gameId || "MISSING"}`;
+  elGamePill.textContent = `game: ${sessionId || "MISSING"}`;
   
   let quiz = null;
   let answers = {};
@@ -109,7 +119,7 @@
   }
   
   async function fetchQuiz() {
-    const url = `${BASE}?action=quiz&game=${encodeURIComponent(gameId)}`;
+    const url = `${BASE}?action=quiz&session=${encodeURIComponent(sessionId)}&game=${encodeURIComponent(gameName)}`;
     const res = await fetch(url);
     const data = await res.json();
     return data;
@@ -121,15 +131,8 @@
     const playerName = elPlayerName.value.trim();
     if (!playerName) return;
   
-    const payload = {
-      token: WRITE_TOKEN,
-      gameId,
-      playerId,
-      playerName,
-      answers,
-      userAgent: navigator.userAgent,
-      autoSubmit: auto
-    };
+    const payload = { action: "submit", sessionId, game: gameName, playerId, playerName, answers, token: WRITE_TOKEN };
+
   
     try {
       const res = await fetch(BASE, {
@@ -185,7 +188,7 @@
   }
   
   async function initStartScreen() {
-    if (!gameId) {
+    if (!sessionId) {
       setStatus("Lien invalide : il manque ?game=XXXX");
       elStartBtn.disabled = true;
       return;
@@ -243,9 +246,9 @@
   elSend.addEventListener("click", () => submit(false));
   
   async function pollStatus() {
-    if (!gameId) return;
+    if (!sessionId) return;
     try {
-      const url = `${BASE}?action=status&game=${encodeURIComponent(gameId)}`;
+      const url = `${BASE}?action=status&game=${encodeURIComponent(sessionId)}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.ok) {
