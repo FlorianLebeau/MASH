@@ -223,7 +223,7 @@ function renderTicks(cfg) {
     tick.className = "tick";
 
     // Labels : extrémités + milieu (tu peux changer si tu veux tout afficher)
-    const showLabel = (idx === 0) || (idx === ticks.length - 1) || (idx === Math.floor(ticks.length / 2));
+    const showLabel = (idx === 0) || (idx === ticks.length - 1);  // || (idx === Math.floor(ticks.length / 2));
     if (showLabel) {
       const lab = document.createElement("div");
       lab.className = "tickLabel";
