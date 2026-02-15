@@ -84,8 +84,7 @@
   const QUESTIONS_PER_ROUND = 10;
   const TICKS_COUNT = 10; // doit matcher ENTRE2_TICKS_COUNT côté Apps Script
 
-  const params = new URLSearchParams(location.search);
-  const gameId = (localStorage.getItem("mash_sessionId") || "").trim();
+  const sessionId = (localStorage.getItem("mash_sessionId") || "").trim();
 
   const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
   localStorage.setItem("mash_playerId", playerId);
