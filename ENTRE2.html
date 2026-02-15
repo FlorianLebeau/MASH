@@ -90,6 +90,10 @@
   const sessionId = (localStorage.getItem("mash_sessionId") || "").trim();
   const gameName = "ENTRE2";
 
+  // Debug visible (à garder 2 min puis tu peux enlever)
+  console.log("[ENTRE2] sessionId=", sessionId);
+  console.log("[ENTRE2] localStorage keys:", Object.keys(localStorage));
+  
   if (!sessionId) {
     setStatus("Aucune session sélectionnée. Retourne sur la Home.");
   }
@@ -300,13 +304,19 @@
   });
 
 function validateStart() {
-  const ok = playerNameInput.value.trim().length > 0 && !!sessionId;
-  startBtn.disabled = !ok;
-  startHint.textContent = !sessionId ? "Retourne sur la Home et sélectionne une session" : (ok ? "" : "Entre un pseudo");
-}
+  const nameOk = playerNameInput.value.trim().length > 0;
+  const sessionOk = sessionId && sessionId.length > 0;
 
-validateStart();
-if (!sessionId) setStatus("Lien invalide : aucune session sélectionnée (retour Home).");
+  startBtn.disabled = !(nameOk && sessionOk);
+
+  if (!sessionOk) {
+    startHint.textContent = "Aucune session sélectionnée (retour Home)";
+  } else if (!nameOk) {
+    startHint.textContent = "Entre un pseudo";
+  } else {
+    startHint.textContent = "";
+  }
+}
 
 
   function jsonp(url) {
