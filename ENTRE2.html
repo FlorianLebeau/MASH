@@ -79,28 +79,19 @@
   <p class="muted" id="status"></p>
 
 <script>
-
-  let isSubmitting = false;
-  
+  // ---- Config ----
   const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec";
-  const WRITE_TOKEN = "YUKI"; // <-- mets "" si tu n'utilises pas de token
+  const WRITE_TOKEN = "YUKI"; // mets "" si tu n'utilises pas de token
   const QUESTIONS_PER_ROUND = 10;
   const TICKS_COUNT = 10; // doit matcher ENTRE2_TICKS_COUNT côté Apps Script
 
   const sessionId = (localStorage.getItem("mash_sessionId") || "").trim();
   const gameName = "ENTRE2";
 
-  // Debug visible (à garder 2 min puis tu peux enlever)
-  console.log("[ENTRE2] sessionId=", sessionId);
-  console.log("[ENTRE2] localStorage keys:", Object.keys(localStorage));
-  
-  if (!sessionId) {
-    setStatus("Aucune session sélectionnée. Retourne sur la Home.");
-  }
-  
   const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
   localStorage.setItem("mash_playerId", playerId);
 
+  // ---- DOM ----
   const qPill = document.getElementById("qPill");
   const aff = document.getElementById("aff");
   const qid = document.getElementById("qid");
@@ -116,13 +107,15 @@
   const startHint = document.getElementById("startHint");
 
   const nextBtn = document.getElementById("nextBtn");
-  const nextHint = document.getElementById("nextHint");
+  const nextHint = document.getElementById("nextHint"); // (réservé si tu veux des hints)
 
   const minR = document.getElementById("minR");
   const maxR = document.getElementById("maxR");
   const rangeFill = document.getElementById("rangeFill");
   const ticksBar = document.getElementById("ticksBar");
 
+  // ---- State ----
+  let isSubmitting = false;
   let unit = "";
   let cfg = null;
 
@@ -132,13 +125,36 @@
   let currentQ = null;
   let qNum = 0;
 
+  // ---- Helpers ----
   function setStatus(msg){ statusEl.textContent = msg || ""; }
+
+  function jsonp(url) {
+    return new Promise((resolve, reject) => {
+      const cb = "cb_" + Math.random().toString(36).slice(2);
+      const script = document.createElement("script");
+
+      window[cb] = (data) => {
+        delete window[cb];
+        script.remove();
+        resolve(data);
+      };
+
+      script.onerror = () => {
+        delete window[cb];
+        script.remove();
+        reject(new Error("JSONP load failed"));
+      };
+
+      const sep = url.includes("?") ? "&" : "?";
+      script.src = `${url}${sep}callback=${encodeURIComponent(cb)}`;
+      document.head.appendChild(script);
+    });
+  }
 
   function parseScaleGroup(raw) {
     const s = String(raw ?? "").toLowerCase().trim();
     const n = Number(s);
     if (Number.isFinite(n) && (n === 1 || n === 2 || n === 3)) return n;
-
     if (s.includes("1") && s.includes("10")) return 1;
     if (s.includes("10") && s.includes("100") && !s.includes("1000")) return 2;
     if (s.includes("100") && s.includes("1000")) return 3;
@@ -153,6 +169,7 @@
     if (g === 2) { min = 10;  max = 100; }
     if (g === 3) { min = 100; max = 1000; }
 
+    // 10 crans => 9 intervalles
     const step = (max - min) / (TICKS_COUNT - 1);
     const stepInt = Math.round(step);
 
@@ -171,6 +188,7 @@
     ticks.forEach((t, idx) => {
       const tick = document.createElement("div");
       tick.className = "tick";
+
       const showLabel = (idx === 0) || (idx === ticks.length - 1);
       if (showLabel) {
         const lab = document.createElement("div");
@@ -178,6 +196,7 @@
         lab.textContent = String(t);
         tick.appendChild(lab);
       }
+
       ticksBar.appendChild(tick);
     });
   }
@@ -186,6 +205,8 @@
     [minR, maxR].forEach(r => { r.min = min; r.max = max; r.step = step; });
     minR.value = min;
     maxR.value = max;
+    minR.disabled = false;
+    maxR.disabled = false;
   }
 
   function clampAndSync(which) {
@@ -210,15 +231,17 @@
     intervalPill.textContent = `intervalle: ${a} – ${b} ${unit}`.trim();
   }
 
-  minR.addEventListener("input", () => clampAndSync("min"));
-  maxR.addEventListener("input", () => clampAndSync("max"));
-
   function captureCurrentInterval() {
     const a = Number(minR.value);
     const b = Number(maxR.value);
     return { min: Math.min(a,b), max: Math.max(a,b) };
   }
 
+  // ---- Events sliders ----
+  minR.addEventListener("input", () => clampAndSync("min"));
+  maxR.addEventListener("input", () => clampAndSync("max"));
+
+  // ---- Game flow ----
   async function loadNextQuestion() {
     qNum += 1;
     qPill.textContent = `Q: ${qNum}/${QUESTIONS_PER_ROUND}`;
@@ -226,6 +249,8 @@
 
     const exclude = askedQids.join(",");
     const url = `${BASE}?action=entre2_question&exclude=${encodeURIComponent(exclude)}`;
+
+    // JSONP pour éviter CORS
     const data = await jsonp(url);
 
     if (!data.ok) { setStatus(`Erreur: ${data.error}`); return; }
@@ -246,11 +271,19 @@
     setSliders(cfg);
     clampAndSync("min");
 
+    nextBtn.disabled = false;
     nextBtn.textContent = (qNum >= QUESTIONS_PER_ROUND) ? "Terminer" : "Suivant";
     setStatus(`Question ${qNum}/${QUESTIONS_PER_ROUND} ✅`);
   }
 
   async function submitRound() {
+    if (collected.length !== QUESTIONS_PER_ROUND) {
+      setStatus(`Erreur: ${collected.length} réponses (attendu ${QUESTIONS_PER_ROUND})`);
+      isSubmitting = false;
+      nextBtn.disabled = false;
+      return;
+    }
+
     setStatus("Envoi des réponses…");
 
     const payload = {
@@ -270,7 +303,12 @@
     });
 
     const out = await res.json();
-    if (!out.ok) { setStatus(`Erreur submit: ${out.error}`); return; }
+    if (!out.ok) {
+      setStatus(`Erreur submit: ${out.error}`);
+      isSubmitting = false;
+      nextBtn.disabled = false;
+      return;
+    }
 
     // Lock UI
     nextBtn.disabled = true;
@@ -282,10 +320,10 @@
 
   nextBtn.addEventListener("click", async () => {
     if (!currentQ || isSubmitting) return;
-  
+
     const {min, max} = captureCurrentInterval();
     collected.push({ qId: currentQ.qId, min, max });
-  
+
     if (qNum >= QUESTIONS_PER_ROUND) {
       isSubmitting = true;
       nextBtn.disabled = true;
@@ -293,58 +331,53 @@
     } else {
       await loadNextQuestion();
     }
-
-    if (collected.length !== QUESTIONS_PER_ROUND) {
-    setStatus(`Erreur: ${collected.length} réponses (attendu ${QUESTIONS_PER_ROUND})`);
-    isSubmitting = false;
-    nextBtn.disabled = false;
-    return;
-  }
-    
   });
 
-function validateStart() {
-  const name = playerNameInput.value.trim();
-  const nameOk = name.length > 0;
-  const sessionOk = !!sessionId;
+  // ---- Start screen ----
+  function validateStart() {
+    const name = playerNameInput.value.trim();
+    const nameOk = name.length > 0;
+    const sessionOk = !!sessionId;
 
-  const canStart = nameOk && sessionOk;
+    startBtn.disabled = !(nameOk && sessionOk);
 
-  console.log("[ENTRE2] validateStart", { name, nameOk, sessionId, sessionOk, canStart });
-
-  startBtn.disabled = !canStart;
-
-  if (!sessionOk) startHint.textContent = "Aucune session sélectionnée (retour Home)";
-  else if (!nameOk) startHint.textContent = "Entre un pseudo";
-  else startHint.textContent = "";
-}
+    if (!sessionOk) startHint.textContent = "Aucune session sélectionnée (retour Home)";
+    else if (!nameOk) startHint.textContent = "Entre un pseudo";
+    else startHint.textContent = "";
+  }
 
   playerNameInput.addEventListener("input", validateStart);
-  validateStart();
 
-  function jsonp(url) {
-  return new Promise((resolve, reject) => {
-    const cb = "cb_" + Math.random().toString(36).slice(2);
-    const script = document.createElement("script");
+  startBtn.addEventListener("click", async () => {
+    currentPlayerName = playerNameInput.value.trim();
+    if (!currentPlayerName || !sessionId) return;
 
-    window[cb] = (data) => {
-      delete window[cb];
-      script.remove();
-      resolve(data);
-    };
+    startCard.style.display = "none";
+    gameArea.style.display = "block";
 
-    script.onerror = () => {
-      delete window[cb];
-      script.remove();
-      reject(new Error("JSONP load failed"));
-    };
+    // init state
+    isSubmitting = false;
+    askedQids = [];
+    collected = [];
+    currentQ = null;
+    qNum = 0;
 
-    const sep = url.includes("?") ? "&" : "?";
-    script.src = `${url}${sep}callback=${encodeURIComponent(cb)}`;
-    document.head.appendChild(script);
+    try {
+      await loadNextQuestion();
+    } catch (e) {
+      console.error("[ENTRE2] loadNextQuestion failed", e);
+      setStatus("Erreur au chargement de la 1ère question (voir console).");
+      startCard.style.display = "block";
+      gameArea.style.display = "none";
+    }
   });
-}
 
+  // ---- Init ----
+  if (!sessionId) {
+    setStatus("Lien invalide : aucune session sélectionnée (retour Home).");
+  }
+  validateStart();
 </script>
 </body>
 </html>
+
