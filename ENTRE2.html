@@ -178,6 +178,83 @@ function parseScaleGroup(raw) {
   return 1;
 }
 
+  const params = new URLSearchParams(location.search);
+const gameId = (params.get("game") || "").trim();
+
+const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
+localStorage.setItem("mash_playerId", playerId);
+
+let currentPlayerName = "";
+let askedQids = [];
+let collected = []; // {qId,min,max}
+let currentQ = null;
+let qNum = 0;
+
+async function loadNextQuestion() {
+  qNum += 1;
+  statusEl.textContent = `Question ${qNum}/10…`;
+
+  const exclude = askedQids.join(",");
+  const url = `${BASE}?action=entre2_question&exclude=${encodeURIComponent(exclude)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!data.ok) { statusEl.textContent = `Erreur: ${data.error}`; return; }
+
+  currentQ = data;
+  askedQids.push(data.qId);
+
+  // re-render question + slider config (tu as déjà ça)
+  aff.textContent = data.affirmation;
+  unit = data.unitGroup || "";
+  unitPill.textContent = `unit: ${unit || "-"}`;
+
+  cfg = configForScaleGroup(data.scaleGroup);
+  scalePill.textContent = `scale: ${cfg.group}`;
+  renderTicks(cfg);
+  setSliders(cfg);
+  clampAndSync("min");
+
+  statusEl.textContent = `Question ${qNum}/10 ✅`;
+}
+
+function captureCurrentInterval() {
+  const a = Number(minR.value);
+  const b = Number(maxR.value);
+  return { min: Math.min(a,b), max: Math.max(a,b) };
+}
+
+// bouton suivant
+async function onNext() {
+  const {min,max} = captureCurrentInterval();
+  collected.push({ qId: currentQ.qId, min, max });
+
+  if (qNum >= 10) {
+    // submit
+    const payload = {
+      action: "entre2_submit",
+      token: WRITE_TOKEN,
+      gameId,
+      playerId,
+      playerName: currentPlayerName,
+      answers: collected
+    };
+
+    const res = await fetch(BASE, {
+      method: "POST",
+      headers: {"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify(payload)
+    });
+
+    const out = await res.json();
+    if (!out.ok) { statusEl.textContent = `Erreur submit: ${out.error}`; return; }
+
+    statusEl.textContent = `Terminé ✅ Score: ${out.score20} / 20`;
+    // (optionnel) afficher détails out.perQuestion
+    return;
+  }
+
+  await loadNextQuestion();
+}
 function configForScaleGroup(rawGroup) {
   const g = parseScaleGroup(rawGroup);
 
