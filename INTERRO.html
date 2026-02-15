@@ -117,9 +117,7 @@
   
   async function fetchQuiz() {
     const url = `${BASE}?action=quiz&session=${encodeURIComponent(sessionId)}&game=${encodeURIComponent(gameName)}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    return data;
+    return await jsonp(url);
   }
   
   async function submit(auto=false) {
@@ -256,8 +254,8 @@
     if (!sessionId) return;
     try {
       const url = `${BASE}?action=status&session=${encodeURIComponent(sessionId)}&game=${encodeURIComponent(gameName)}`;
-      const res = await fetch(url);
-      const data = await res.json();
+      const data = await jsonp(url);
+
       if (data.ok) {
         elRecvPill.textContent = `réponses: ${data.received}${data.expectedPlayers ? " / " + data.expectedPlayers : ""}`;
       }
@@ -266,6 +264,29 @@
   
   // init
   initStartScreen();
+
+  function jsonp(url) {
+  return new Promise((resolve, reject) => {
+    const cb = "cb_" + Math.random().toString(36).slice(2);
+    const script = document.createElement("script");
+
+    window[cb] = (data) => {
+      delete window[cb];
+      script.remove();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      delete window[cb];
+      script.remove();
+      reject(new Error("JSONP load failed"));
+    };
+
+    const sep = url.includes("?") ? "&" : "?";
+    script.src = `${url}${sep}callback=${encodeURIComponent(cb)}`;
+    document.head.appendChild(script);
+  });
+}
 </script>
 </body>
 </html>
