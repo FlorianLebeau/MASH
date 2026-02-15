@@ -79,13 +79,21 @@
   <p class="muted" id="status"></p>
 
 <script>
+
+  let isSubmitting = false;
+  
   const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec";
   const WRITE_TOKEN = "YUKI"; // <-- mets "" si tu n'utilises pas de token
   const QUESTIONS_PER_ROUND = 10;
   const TICKS_COUNT = 10; // doit matcher ENTRE2_TICKS_COUNT côté Apps Script
 
   const sessionId = (localStorage.getItem("mash_sessionId") || "").trim();
+  const gameName = "ENTRE2";
 
+  if (!sessionId) {
+    setStatus("Aucune session sélectionnée. Retourne sur la Home.");
+  }
+  
   const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
   localStorage.setItem("mash_playerId", playerId);
 
@@ -214,8 +222,7 @@
 
     const exclude = askedQids.join(",");
     const url = `${BASE}?action=entre2_question&exclude=${encodeURIComponent(exclude)}`;
-    const res = await fetch(url);
-    const data = await res.json();
+    const data = await jsonp(url);
 
     if (!data.ok) { setStatus(`Erreur: ${data.error}`); return; }
 
@@ -245,7 +252,8 @@
     const payload = {
       action: "entre2_submit",
       token: WRITE_TOKEN,
-      gameId,
+      sessionId,
+      game: gameName,
       playerId,
       playerName: currentPlayerName,
       answers: collected
@@ -269,43 +277,61 @@
   }
 
   nextBtn.addEventListener("click", async () => {
-    if (!currentQ) return;
-
+    if (!currentQ || isSubmitting) return;
+  
     const {min, max} = captureCurrentInterval();
     collected.push({ qId: currentQ.qId, min, max });
-
+  
     if (qNum >= QUESTIONS_PER_ROUND) {
+      isSubmitting = true;
+      nextBtn.disabled = true;
       await submitRound();
     } else {
       await loadNextQuestion();
     }
-  });
 
-  function validateStart() {
-    const ok = playerNameInput.value.trim().length > 0 && !!gameId;
-    startBtn.disabled = !ok;
-    startHint.textContent = !gameId ? "Ajoute ?game=XXXX dans l’URL" : (ok ? "" : "Entre un pseudo");
+    if (collected.length !== QUESTIONS_PER_ROUND) {
+    setStatus(`Erreur: ${collected.length} réponses (attendu ${QUESTIONS_PER_ROUND})`);
+    isSubmitting = false;
+    nextBtn.disabled = false;
+    return;
   }
-
-  playerNameInput.addEventListener("input", validateStart);
-
-  startBtn.addEventListener("click", async () => {
-    currentPlayerName = playerNameInput.value.trim();
-    startCard.style.display = "none";
-    gameArea.style.display = "block";
-
-    // init
-    askedQids = [];
-    collected = [];
-    currentQ = null;
-    qNum = 0;
-
-    await loadNextQuestion();
+    
   });
 
-  // init
-  validateStart();
-  if (!gameId) setStatus("Lien invalide : ajoute ?game=XXXX");
+function validateStart() {
+  const ok = playerNameInput.value.trim().length > 0 && !!sessionId;
+  startBtn.disabled = !ok;
+  startHint.textContent = !sessionId ? "Retourne sur la Home et sélectionne une session" : (ok ? "" : "Entre un pseudo");
+}
+
+validateStart();
+if (!sessionId) setStatus("Lien invalide : aucune session sélectionnée (retour Home).");
+
+
+  function jsonp(url) {
+  return new Promise((resolve, reject) => {
+    const cb = "cb_" + Math.random().toString(36).slice(2);
+    const script = document.createElement("script");
+
+    window[cb] = (data) => {
+      delete window[cb];
+      script.remove();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      delete window[cb];
+      script.remove();
+      reject(new Error("JSONP load failed"));
+    };
+
+    const sep = url.includes("?") ? "&" : "?";
+    script.src = `${url}${sep}callback=${encodeURIComponent(cb)}`;
+    document.head.appendChild(script);
+  });
+}
+
 </script>
 </body>
 </html>
