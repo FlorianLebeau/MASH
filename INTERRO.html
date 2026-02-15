@@ -47,15 +47,12 @@
   
   const sessionId = (localStorage.getItem("mash_sessionId") || "").trim();
   const gameName = "INTERRO";
-
+  
   if (!sessionId) {
-  document.body.innerHTML = `
-    <h1>INTERRO</h1>
-    <p>Lien invalide : aucune session sélectionnée.</p>
-    <p>Retourne sur la Home et choisis une session.</p>
-  `;
-  throw new Error("Missing sessionId in localStorage");
-}
+    setStatus("Aucune session sélectionnée. Retourne sur la Home.");
+    // option : désactiver start
+    // elStartBtn.disabled = true;
+  }
   
   const playerId = localStorage.getItem("mash_playerId") || crypto.randomUUID();
   localStorage.setItem("mash_playerId", playerId);
@@ -74,7 +71,7 @@
   const elSend = document.getElementById("send");
   const elStatus = document.getElementById("status");
   
-  elGamePill.textContent = `game: ${sessionId || "MISSING"}`;
+  elGamePill.textContent = `session: ${sessionId || "MISSING"} | jeu: ${gameName}`;
   
   let quiz = null;
   let answers = {};
@@ -131,7 +128,16 @@
     const playerName = elPlayerName.value.trim();
     if (!playerName) return;
   
-    const payload = { action: "submit", sessionId, game: gameName, playerId, playerName, answers, token: WRITE_TOKEN };
+    const payload = {
+      token: WRITE_TOKEN,
+      sessionId,
+      game: gameName,
+      playerId,
+      playerName,
+      answers,
+      userAgent: navigator.userAgent,
+      autoSubmit: auto
+    };
 
   
     try {
@@ -189,7 +195,7 @@
   
   async function initStartScreen() {
     if (!sessionId) {
-      setStatus("Lien invalide : il manque ?game=XXXX");
+      setStatus("Lien invalide : aucune session sélectionnée (retour Home).");
       elStartBtn.disabled = true;
       return;
     }
@@ -204,7 +210,8 @@
     }
   
     quiz = data;
-    document.getElementById("title")?.remove?.(); // si tu as un title id, ignore sinon
+    document.getElementById("title").textContent = quiz.title ? `MASH — ${quiz.title}` : `MASH — ${gameName}`;
+
   
     // Conditions d’accès
     const isOpen = true; // si ok:true, c’est OPEN (ton backend bloque sinon)
@@ -248,7 +255,7 @@
   async function pollStatus() {
     if (!sessionId) return;
     try {
-      const url = `${BASE}?action=status&game=${encodeURIComponent(sessionId)}`;
+      const url = `${BASE}?action=status&session=${encodeURIComponent(sessionId)}&game=${encodeURIComponent(gameName)}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.ok) {
