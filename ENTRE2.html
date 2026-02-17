@@ -249,9 +249,6 @@
 
     const exclude = askedQids.join(",");
     const url = `${BASE}?action=entre2_question&session=${encodeURIComponent(sessionId)}&n=${qNum}`;
-    const data = await jsonp(url);
-
-
 
     // JSONP pour éviter CORS
     const data = await jsonp(url);
