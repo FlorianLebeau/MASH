@@ -248,7 +248,8 @@
     setStatus(`Chargement question ${qNum}/${QUESTIONS_PER_ROUND}…`);
 
     const exclude = askedQids.join(",");
-    const url = `${BASE}?action=entre2_question&exclude=${encodeURIComponent(exclude)}`;
+    const url = `${BASE}?action=entre2_question&session=${encodeURIComponent(sessionId)}&exclude=...`;
+
 
     // JSONP pour éviter CORS
     const data = await jsonp(url);
