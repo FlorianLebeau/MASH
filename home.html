@@ -1,136 +1,113 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MASH — Home</title>
-  <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;max-width:920px}
-    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    .card{padding:16px;border:1px solid #ddd;border-radius:14px;margin:12px 0}
-    .pill{display:inline-block;padding:6px 10px;border:1px solid #ddd;border-radius:999px}
-    .muted{opacity:.7}
-    button,a.btn{display:inline-block;padding:10px 14px;border-radius:12px;border:1px solid #ddd;background:#fff;cursor:pointer;text-decoration:none}
-    button:disabled{opacity:.5;cursor:not-allowed}
-    h1{margin:0 0 6px}
-    .sessionTitle{font-weight:800;font-size:18px;margin:0 0 8px}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MASH — Home</title>
+<style>
+body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;max-width:720px}
+.card{padding:16px;border:1px solid #ddd;border-radius:14px;margin:12px 0}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+button{
+  padding:10px 14px;
+  border-radius:12px;
+  border:1px solid #ddd;
+  background:#fff;
+  cursor:pointer;
+}
+button:hover{background:#f5f5f5}
+.pill{display:inline-block;padding:6px 10px;border:1px solid #ddd;border-radius:999px}
+.muted{opacity:.6}
+</style>
 </head>
+
 <body>
-  <h1>MASH</h1>
-  <p class="muted">Choisis une session, puis un jeu.</p>
 
+<h1>MASH</h1>
+
+<div class="card">
+  <div style="font-weight:700;margin-bottom:10px;">Session</div>
   <div class="row">
-    <span class="pill" id="sessionPill">Session: -</span>
-    <button id="clearSession">Effacer session</button>
-    <span class="muted" id="status"></span>
+    <input id="sessionInput" placeholder="Session ID (ex: Alpha2)" />
+    <button id="saveSessionBtn">Valider</button>
   </div>
+  <div class="muted" id="sessionInfo"></div>
+</div>
 
-  <div id="sessionsRoot"></div>
+<div class="card">
+  <div style="font-weight:700;margin-bottom:10px;">Jeux disponibles</div>
+  <div id="gamesList" class="row"></div>
+</div>
+
+<div class="card">
+  <div style="font-weight:700;margin-bottom:10px;">Classements</div>
+  <button id="resultsBtn">Voir les classements</button>
+</div>
 
 <script>
-  const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec"; // .../exec
 
-  const sessionsRoot = document.getElementById("sessionsRoot");
-  const sessionPill = document.getElementById("sessionPill");
-  const statusEl = document.getElementById("status");
+const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec";
 
-  const KEY_SESSION = "mash_sessionId";
+const sessionInput = document.getElementById("sessionInput");
+const saveSessionBtn = document.getElementById("saveSessionBtn");
+const sessionInfo = document.getElementById("sessionInfo");
+const gamesList = document.getElementById("gamesList");
+const resultsBtn = document.getElementById("resultsBtn");
 
-  function setStatus(msg){ statusEl.textContent = msg || ""; }
+let sessionId = localStorage.getItem("mash_sessionId") || "";
 
-  function getSession(){ return (localStorage.getItem(KEY_SESSION) || "").trim(); }
-  function setSession(id){
-    localStorage.setItem(KEY_SESSION, id);
-    sessionPill.textContent = `Session: ${id}`;
-  }
-  function clearSession(){
-    localStorage.removeItem(KEY_SESSION);
-    sessionPill.textContent = "Session: -";
-  }
+if (sessionId) {
+  sessionInput.value = sessionId;
+  sessionInfo.textContent = `Session active: ${sessionId}`;
+  loadGames();
+}
 
-  document.getElementById("clearSession").addEventListener("click", () => {
-    clearSession();
-  });
+saveSessionBtn.addEventListener("click", () => {
+  sessionId = sessionInput.value.trim();
+  if (!sessionId) return;
+  localStorage.setItem("mash_sessionId", sessionId);
+  sessionInfo.textContent = `Session active: ${sessionId}`;
+  loadGames();
+});
 
-  function routeForGameName(gameName){
-    const g = (gameName || "").toUpperCase().trim();
-    if (g === "INTERRO") return "./INTERRO.html";     // page quiz existante
-    if (g === "ENTRE2")  return "./ENTRE2.html";
-    // fallback : plus tard
-    return "#";
-  }
+async function loadGames() {
+  gamesList.innerHTML = "";
+  if (!sessionId) return;
 
-  function renderSessions(sessions){
-    sessionsRoot.innerHTML = "";
+  const url = `${BASE}?action=list_games&session=${encodeURIComponent(sessionId)}`;
 
-    if (!sessions || sessions.length === 0){
-      const d = document.createElement("div");
-      d.className = "card";
-      d.textContent = "Aucune session OPEN trouvée.";
-      sessionsRoot.appendChild(d);
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.ok) {
+      gamesList.innerHTML = `<span class="muted">${data.error}</span>`;
       return;
     }
 
-    sessions.forEach(s => {
-      const card = document.createElement("div");
-      card.className = "card";
-
-      const title = document.createElement("div");
-      title.className = "sessionTitle";
-      title.textContent = `Session ${s.sessionId}`;
-      card.appendChild(title);
-
-      const row = document.createElement("div");
-      row.className = "row";
-
-      s.games.forEach(g => {
-        const btn = document.createElement("button");
-        btn.textContent = `${g.game}`;
-        btn.title = `status: ${g.status}${g.expectedPlayers ? " | joueurs: "+g.expectedPlayers : ""}`;
-
-        const href = routeForGameName(g.game);
-        btn.disabled = (href === "#") || (g.status !== "OPEN");
-
-        btn.addEventListener("click", () => {
-          setSession(s.sessionId);
-          // redirection sans SessionID dans l’URL
-          location.href = href;
-        });
-
-        row.appendChild(btn);
-      });
-
-      card.appendChild(row);
-      sessionsRoot.appendChild(card);
+    data.games.forEach(g => {
+      const btn = document.createElement("button");
+      btn.textContent = g;
+      btn.onclick = () => {
+        window.location.href = `${g}.html`;
+      };
+      gamesList.appendChild(btn);
     });
+
+  } catch(e) {
+    gamesList.innerHTML = `<span class="muted">Erreur chargement jeux</span>`;
   }
+}
 
-  async function load(){
-    const current = getSession();
-    sessionPill.textContent = current ? `Session: ${current}` : "Session: -";
-
-    setStatus("Chargement des sessions…");
-    try{
-      const url = `${BASE}?action=sessions&openOnly=1`;
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (!data.ok){
-        setStatus(`Erreur: ${data.error}`);
-        return;
-      }
-
-      renderSessions(data.sessions);
-      setStatus("");
-    }catch(e){
-      console.warn(e);
-      setStatus("Erreur réseau ou URL BASE incorrecte.");
-    }
+resultsBtn.addEventListener("click", () => {
+  if (!sessionId) {
+    alert("Sélectionne une session d'abord.");
+    return;
   }
+  window.location.href = "results.html";
+});
 
-  load();
 </script>
 </body>
 </html>
+
 
