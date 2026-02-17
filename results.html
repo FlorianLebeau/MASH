@@ -3,26 +3,34 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MASH — Résultats</title>
+  <title>MASH — Classements</title>
   <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;max-width:900px}
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;max-width:820px}
     .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    .pill{display:inline-block;padding:6px 10px;border:1px solid #ddd;border-radius:999px}
-    table{width:100%;border-collapse:collapse;margin-top:12px}
+    .card{padding:16px;border:1px solid #ddd;border-radius:14px;margin:12px 0}
+    .muted{opacity:.65}
+    select,button{padding:10px;border-radius:12px;border:1px solid #ddd;background:#fff}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
     th,td{border-bottom:1px solid #eee;padding:10px;text-align:left}
-    th{opacity:.7;font-weight:700}
-    .muted{opacity:.7}
+    th{font-weight:700}
+    .pill{display:inline-block;padding:6px 10px;border:1px solid #ddd;border-radius:999px}
   </style>
 </head>
 <body>
-  <h1>MASH — Résultats</h1>
 
+<h1>MASH — Classements</h1>
+
+<div class="row">
+  <span class="pill" id="sessionPill">session: -</span>
+  <span class="pill" id="recvPill">joueurs: -</span>
+</div>
+
+<div class="card">
   <div class="row">
-    <span class="pill" id="gamePill">game: ?</span>
-    <span class="pill" id="countPill">lignes: -</span>
-    <span class="pill" id="refreshPill">maj: -</span>
+    <label for="gameSelect" style="font-weight:700;">Jeu</label>
+    <select id="gameSelect"></select>
+    <button id="backBtn">Retour Home</button>
   </div>
-
   <p class="muted" id="status"></p>
 
   <table>
@@ -31,80 +39,146 @@
         <th>#</th>
         <th>Joueur</th>
         <th>Score</th>
-        <th>Horodatage</th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
   </table>
+</div>
 
 <script>
-  const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec"; // .../exec
+  const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec";
 
-  const params = new URLSearchParams(location.search);
-  const gameId = (params.get("game") || "").trim();
+  const sessionId = (localStorage.getItem("mash_sessionId") || "").trim();
 
-  const elGamePill = document.getElementById("gamePill");
-  const elCountPill = document.getElementById("countPill");
-  const elRefreshPill = document.getElementById("refreshPill");
-  const elStatus = document.getElementById("status");
+  const sessionPill = document.getElementById("sessionPill");
+  const recvPill = document.getElementById("recvPill");
+  const statusEl = document.getElementById("status");
+  const gameSelect = document.getElementById("gameSelect");
   const tbody = document.getElementById("tbody");
+  const backBtn = document.getElementById("backBtn");
 
-  elGamePill.textContent = `game: ${gameId || "MISSING"}`;
+  function setStatus(s){ statusEl.textContent = s || ""; }
 
-  function setStatus(msg){ elStatus.textContent = msg || ""; }
+  function jsonp(url) {
+    return new Promise((resolve, reject) => {
+      const cb = "cb_" + Math.random().toString(36).slice(2);
+      const script = document.createElement("script");
 
-  function render(rows){
+      window[cb] = (data) => {
+        delete window[cb];
+        script.remove();
+        resolve(data);
+      };
+
+      script.onerror = () => {
+        delete window[cb];
+        script.remove();
+        reject(new Error("JSONP load failed"));
+      };
+
+      const sep = url.includes("?") ? "&" : "?";
+      script.src = `${url}${sep}callback=${encodeURIComponent(cb)}`;
+      document.head.appendChild(script);
+    });
+  }
+
+  function renderTable(list) {
     tbody.innerHTML = "";
-    rows.forEach((r, idx) => {
+    list.forEach((p, idx) => {
       const tr = document.createElement("tr");
-
-      const tdRank = document.createElement("td");
-      tdRank.textContent = String(idx + 1);
-
-      const tdName = document.createElement("td");
-      tdName.textContent = r.playerName || "(sans nom)";
-
-      const tdScore = document.createElement("td");
-      tdScore.textContent = String(r.score ?? 0);
-
-      const tdTs = document.createElement("td");
-      tdTs.textContent = r.ts ? new Date(r.ts).toLocaleTimeString("fr-FR") : "";
-
-      tr.appendChild(tdRank);
-      tr.appendChild(tdName);
-      tr.appendChild(tdScore);
-      tr.appendChild(tdTs);
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>${escapeHtml(p.playerName || "(sans nom)")}</td>
+        <td><b>${Number(p.score || 0)}</b></td>
+      `;
       tbody.appendChild(tr);
     });
   }
 
-  async function fetchLeaderboard(){
-    if (!gameId) { setStatus("Lien invalide : ?game=... manquant"); return; }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[m]));
+  }
 
-    try{
-      const url = `${BASE}?action=leaderboard&game=${encodeURIComponent(gameId)}`;
-      const res = await fetch(url);
-      const data = await res.json();
+  async function loadGames() {
+    // Remplit le menu : "GÉNÉRAL" + jeux OPEN de la session
+    const url = `${BASE}?action=list_games&session=${encodeURIComponent(sessionId)}`;
+    const data = await jsonp(url);
 
-      if (!data.ok){
+    if (!data.ok) throw new Error(data.error || "list_games failed");
+
+    gameSelect.innerHTML = "";
+
+    // option général
+    const optAll = document.createElement("option");
+    optAll.value = "ALL";
+    optAll.textContent = "GÉNÉRAL (tous jeux)";
+    gameSelect.appendChild(optAll);
+
+    (data.games || []).forEach(g => {
+      const opt = document.createElement("option");
+      opt.value = g;
+      opt.textContent = g;
+      gameSelect.appendChild(opt);
+    });
+
+    // sélection par défaut : général
+    gameSelect.value = "ALL";
+  }
+
+  async function pollLeaderboard() {
+    const game = (gameSelect.value || "ALL").trim();
+    const url = `${BASE}?action=leaderboard&session=${encodeURIComponent(sessionId)}&game=${encodeURIComponent(game)}`;
+
+    try {
+      const data = await jsonp(url);
+      if (!data.ok) {
         setStatus(`Erreur: ${data.error}`);
         return;
       }
 
-      elCountPill.textContent = `lignes: ${data.count}`;
-      elRefreshPill.textContent = `maj: ${new Date().toLocaleTimeString("fr-FR")}`;
-      setStatus("");
+      recvPill.textContent = `joueurs: ${data.received || 0}`;
+      renderTable(data.leaderboard || []);
+      setStatus(`OK — ${new Date().toLocaleTimeString()}`);
 
-      render(data.leaderboard || []);
-    } catch(e){
-      setStatus("Impossible de récupérer les résultats (réseau ?)");
+    } catch (e) {
+      setStatus("Erreur chargement classement (voir console).");
       console.warn(e);
     }
   }
 
-  // 1er chargement + refresh auto
-  fetchLeaderboard();
-  setInterval(fetchLeaderboard, 2000);
+  backBtn.addEventListener("click", () => {
+    window.location.href = "index.html";
+  });
+
+  gameSelect.addEventListener("change", () => {
+    pollLeaderboard();
+  });
+
+  async function init() {
+    if (!sessionId) {
+      sessionPill.textContent = "session: MISSING";
+      setStatus("Aucune session sélectionnée. Retour Home.");
+      return;
+    }
+
+    sessionPill.textContent = `session: ${sessionId}`;
+    setStatus("Chargement…");
+
+    try {
+      await loadGames();
+      await pollLeaderboard();
+      setInterval(pollLeaderboard, 2000); // live-ish (2s)
+      setStatus("Live ✅");
+    } catch (e) {
+      console.warn(e);
+      setStatus(`Erreur init: ${e.message || e}`);
+    }
+  }
+
+  init();
 </script>
 </body>
 </html>
+
