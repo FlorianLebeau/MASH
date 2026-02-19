@@ -53,6 +53,7 @@ const saveSessionBtn = document.getElementById("saveSessionBtn");
 const sessionInfo = document.getElementById("sessionInfo");
 const gamesList = document.getElementById("gamesList");
 const resultsBtn = document.getElementById("resultsBtn");
+const correctionBtn = document.getElementById("correctionBtn");
 
 let sessionId = localStorage.getItem("mash_sessionId") || "";
 
@@ -106,6 +107,14 @@ resultsBtn.addEventListener("click", () => {
   window.location.href = "results.html";
 });
 
+  correctionBtn.addEventListener("click", () => {
+  if (!sessionId) {
+    alert("Sélectionne une session d'abord.");
+    return;
+  }
+  window.location.href = "correction.html";
+});
+  
 </script>
 </body>
 </html>
