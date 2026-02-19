@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MASH — Correction</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px;max-width:920px}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .card{padding:16px;border:1px solid #ddd;border-radius:14px;margin:12px 0}
+    .pill{display:inline-block;padding:6px 10px;border:1px solid #ddd;border-radius:999px}
+    .muted{opacity:.65}
+    select,button{padding:10px;border-radius:12px;border:1px solid #ddd;background:#fff}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{border-bottom:1px solid #eee;padding:10px;vertical-align:top;text-align:left}
+    th{font-weight:800}
+    td small{opacity:.7}
+  </style>
+</head>
+<body>
+
+<h1>MASH — Correction</h1>
+
+<div class="row">
+  <span class="pill" id="sessionPill">session: -</span>
+  <span class="pill" id="tidPill">TID: -</span>
+  <span class="pill" id="countPill">questions: -</span>
+</div>
+
+<div class="card">
+  <div class="row">
+    <label for="gameSelect" style="font-weight:800;">Jeu</label>
+    <select id="gameSelect"></select>
+    <button id="homeBtn">Retour Home</button>
+  </div>
+  <p class="muted" id="status"></p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:70px;">Rang</th>
+        <th>Question</th>
+        <th style="width:240px;">Réponse attendue</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+  const BASE = "https://script.google.com/macros/s/AKfycbxkzjXgoGlb456tMCTwF4TLdtwdYpBUHZuN5ZEDoOP4Sg4CtNrV1-9Tnv4KSj1o0UR6/exec";
+
+  const sessionId = (localStorage.getItem("mash_sessionId") || "").trim();
+
+  const sessionPill = document.getElementById("sessionPill");
+  const tidPill = document.getElementById("tidPill");
+  const countPill = document.getElementById("countPill");
+  const statusEl = document.getElementById("status");
+  const gameSelect = document.getElementById("gameSelect");
+  const tbody = document.getElementById("tbody");
+  const homeBtn = document.getElementById("homeBtn");
+
+  function setStatus(s){ statusEl.textContent = s || ""; }
+
+  function jsonp(url) {
+    return new Promise((resolve, reject) => {
+      const cb = "cb_" + Math.random().toString(36).slice(2);
+      const script = document.createElement("script");
+      window[cb] = (data) => { delete window[cb]; script.remove(); resolve(data); };
+      script.onerror = () => { delete window[cb]; script.remove(); reject(new Error("JSONP load failed")); };
+      const sep = url.includes("?") ? "&" : "?";
+      script.src = `${url}${sep}callback=${encodeURIComponent(cb)}`;
+      document.head.appendChild(script);
+    });
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[m]));
+  }
+
+  function renderTable(items, game) {
+    tbody.innerHTML = "";
+    (items || []).forEach(it => {
+      const tr = document.createElement("tr");
+
+      const exp = (game === "ENTRE2" && it.unit)
+        ? `${it.expected} ${it.unit}`.trim()
+        : String(it.expected || "");
+
+      tr.innerHTML = `
+        <td><b>${it.rang ?? ""}</b></td>
+        <td>${escapeHtml(it.prompt || "")}</td>
+        <td>${escapeHtml(exp)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function loadGames() {
+    const url = `${BASE}?action=list_games&session=${encodeURIComponent(sessionId)}`;
+    const data = await jsonp(url);
+    if (!data.ok) throw new Error(data.error || "list_games failed");
+
+    gameSelect.innerHTML = "";
+    (data.games || []).forEach(g => {
+      const opt = document.createElement("option");
+      opt.value = g;
+      opt.textContent = g;
+      gameSelect.appendChild(opt);
+    });
+
+    // défaut : premier jeu
+    if (gameSelect.options.length) gameSelect.value = gameSelect.options[0].value;
+  }
+
+  async function loadCorrection() {
+    const game = (gameSelect.value || "").trim();
+    if (!game) return;
+
+    setStatus("Chargement…");
+    const url = `${BASE}?action=correction&session=${encodeURIComponent(sessionId)}&game=${encodeURIComponent(game)}`;
+    const data = await jsonp(url);
+
+    if (!data.ok) {
+      setStatus(`Erreur: ${data.error}`);
+      tidPill.textContent = "TID: -";
+      countPill.textContent = "questions: -";
+      renderTable([], game);
+      return;
+    }
+
+    sessionPill.textContent = `session: ${data.sessionId || sessionId}`;
+    tidPill.textContent = `TID: ${data.tid || "-"}`;
+    countPill.textContent = `questions: ${data.count || 0}`;
+    renderTable(data.items || [], game);
+    setStatus(`OK — ${new Date().toLocaleTimeString()}`);
+  }
+
+  homeBtn.addEventListener("click", () => window.location.href = "index.html");
+  gameSelect.addEventListener("change", loadCorrection);
+
+  async function init() {
+    if (!sessionId) {
+      sessionPill.textContent = "session: MISSING";
+      setStatus("Aucune session sélectionnée. Retour Home.");
+      return;
+    }
+
+    sessionPill.textContent = `session: ${sessionId}`;
+
+    try {
+      await loadGames();
+      await loadCorrection();
+    } catch (e) {
+      console.warn(e);
+      setStatus(`Erreur init: ${e.message || e}`);
+    }
+  }
+
+  init();
+</script>
+
+</body>
+</html>
